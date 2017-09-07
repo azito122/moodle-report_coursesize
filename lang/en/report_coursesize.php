@@ -41,5 +41,5 @@ $string['userstopnum'] = 'Users (top {$a})';
 $string['emptycourseshidden'] = 'Courses that do not use any file storage have been excluded from this report.';
 $string['coursesize_desc'] = '<p>This report only provides approximate values, if a file is used multiple times within a course or in multiple courses the report counts each instance even though Moodle only stores one physical version on disk.</p>';
 $string['sharedusage'] = 'Shared Usage';
-$string['coursesummary'] = '(view stats)';
 $string['sharedusagecourse'] = 'Approx {$a} is shared with other courses.';
+$string['sizeinmb'] = '{$a} MB';

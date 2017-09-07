@@ -15,17 +15,24 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information
+ * Upgrade functions.
  *
  * @package    report_coursesize
- * @copyright  2014 Catalyst IT {@link http://www.catalyst.net.nz}
+ * @copyright  2017 Lafayette College
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version  = 2017080600;
-$plugin->requires = 2012062500;
-$plugin->component = 'report_coursesize';
-$plugin->release = '2.1';
-$plugin->maturity  = MATURITY_STABLE;
+function xmldb_report_coursesize_upgrade($oldversion) {
+    global $CFG;
+
+    if ($oldversion < 2017090600) {
+        // Settings deprecated in favor of the Cache API.
+        unset_config('filessize', 'report_coursesize');
+        unset_config('filessizeupdated', 'report_coursesize');
+        upgrade_plugin_savepoint(true, 2017090600, 'report', 'coursesize');
+    }
+
+    return true;
+}

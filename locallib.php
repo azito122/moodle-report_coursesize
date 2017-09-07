@@ -15,17 +15,20 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information
+ * Upgrade functions.
  *
  * @package    report_coursesize
- * @copyright  2014 Catalyst IT {@link http://www.catalyst.net.nz}
+ * @copyright  2017 Lafayette College
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version  = 2017080600;
-$plugin->requires = 2012062500;
-$plugin->component = 'report_coursesize';
-$plugin->release = '2.1';
-$plugin->maturity  = MATURITY_STABLE;
+// If we should show or hide empty courses.
+define('REPORT_COURSESIZE_SHOWEMPTYCOURSES', false);
+
+// How many users should we show in the User list.
+define('REPORT_COURSESIZE_NUMBEROFUSERS', 10);
+
+// How often should we update the total sitedata usage.
+define('REPORT_COURSESIZE_UPDATETOTAL', 1 * DAYSECS);
