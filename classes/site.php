@@ -37,7 +37,7 @@ class site {
     public static function get_results($coursecategory = 0) {
         $cache = \cache::make('report_coursesize', 'site');
         $results = $cache->get($coursecategory);
-        if ($results === false || $results->date < (time() - (1 * DAYSECS)) || 1) {
+        if ($results === false || $results->date < (time() - (1 * DAYSECS))) {
             $results = new \stdClass();
             $results->date = time();
             $results->total_site_usage = self::get_total_site_usage();
