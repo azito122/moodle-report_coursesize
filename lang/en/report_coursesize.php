@@ -43,3 +43,4 @@ $string['coursesize_desc'] = '<p>This report only provides approximate values, i
 $string['sharedusage'] = 'Shared Usage';
 $string['sharedusagecourse'] = 'Approx {$a} is shared with other courses.';
 $string['sizeinmb'] = '{$a} MB';
+$string['privacy:metadata'] = 'The Course size plugin does not store any personal data.';
