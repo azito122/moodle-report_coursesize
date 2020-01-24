@@ -25,6 +25,7 @@
 require_once('../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->libdir.'/csvlib.class.php');
+require_once('./locallib.php');
 
 admin_externalpage_setup('reportcoursesize');
 
@@ -32,34 +33,17 @@ admin_externalpage_setup('reportcoursesize');
 $coursecategory = optional_param('category', '', PARAM_INT);
 $download = optional_param('download', '', PARAM_INT);
 
-// If we should show or hide empty courses.
-if (!defined('REPORT_COURSESIZE_SHOWEMPTYCOURSES')) {
-    define('REPORT_COURSESIZE_SHOWEMPTYCOURSES', false);
-}
-// How many users should we show in the User list.
-if (!defined('REPORT_COURSESIZE_NUMBEROFUSERS')) {
-    define('REPORT_COURSESIZE_NUMBEROFUSERS', 10);
-}
-// How often should we update the total sitedata usage.
-if (!defined('REPORT_COURSESIZE_UPDATETOTAL')) {
-    define('REPORT_COURSESIZE_UPDATETOTAL', 1 * DAYSECS);
-}
-
 $reportconfig = get_config('report_coursesize');
-if (!empty($reportconfig->filessize) && !empty($reportconfig->filessizeupdated)
-    && ($reportconfig->filessizeupdated > time() - REPORT_COURSESIZE_UPDATETOTAL)) {
+if (!empty($reportconfig->filessize)
+    && !empty($reportconfig->filessizeupdated)
+    && ($reportconfig->filessizeupdated > time() - REPORT_COURSESIZE_UPDATETOTAL_FREQUENCY)) {
     // Total files usage has been recently calculated, and stored by another process - use that.
     $totalusage = $reportconfig->filessize;
     $totaldate = date("Y-m-d H:i", $reportconfig->filessizeupdated);
 } else {
     // Check if the path ends with a "/" otherwise an exception will be thrown
     $sitedatadir = $CFG->dataroot;
-    if (is_dir($sitedatadir)) {
-        // Only append a "/" if it doesn't already end with one
-        if (substr($sitedatadir, -1) !== '/') {
-            $sitedatadir .= '/';
-        }
-    }
+    $sitedatadir = rtrim($sitedatadir, '/') . '/'; // Ensure trailing slash.
 
     // Total files usage either hasn't been stored, or is out of date.
     $totaldate = date("Y-m-d H:i", time());
@@ -73,55 +57,22 @@ $totalusagereadable = number_format(ceil($totalusage / 1048576)) . " MB";
 // TODO: display the sizes of directories (other than filedir) in dataroot
 // eg old 1.9 course dirs, temp, sessions etc.
 
-// Generate a full list of context sitedata usage stats.
-$subsql = 'SELECT f.contextid, sum(f.filesize) as filessize' .
-          ' FROM {files} f';
-$wherebackup = ' WHERE component like \'backup\' AND referencefileid IS NULL';
-$groupby = ' GROUP BY f.contextid';
+$cxsizes = report_coursesize_get_context_sizes();
+$courselookup = report_coursesize_get_course_lookup($coursecategory);
 
-$sizesql = 'SELECT cx.id, cx.contextlevel, cx.instanceid, cx.path, cx.depth,
-            size.filessize, backupsize.filessize as backupsize' .
-           ' FROM {context} cx ' .
-           ' INNER JOIN ( ' . $subsql . $groupby . ' ) size on cx.id=size.contextid' .
-           ' LEFT JOIN ( ' . $subsql . $wherebackup . $groupby . ' ) backupsize on cx.id=backupsize.contextid' .
-           ' ORDER by cx.depth ASC, cx.path ASC';
-$cxsizes = $DB->get_recordset_sql($sizesql);
 $coursesizes = array(); // To track a mapping of courseid to filessize.
 $coursebackupsizes = array(); // To track a mapping of courseid to backup filessize.
 $usersizes = array(); // To track a mapping of users to filesize.
+
 $systemsize = $systembackupsize = 0;
 
-
-// This seems like an in-efficient method to filter by course categories as we are not excluding them from the main list.
-$coursesql = 'SELECT cx.id, c.id as courseid ' .
-    'FROM {course} c ' .
-    ' INNER JOIN {context} cx ON cx.instanceid=c.id AND cx.contextlevel = ' . CONTEXT_COURSE;
-$params = array();
-$courseparams = array();
-$extracoursesql = '';
-if (!empty($coursecategory)) {
-    $context = context_coursecat::instance($coursecategory);
-    $coursecat = core_course_category::get($coursecategory);
-    $courses = $coursecat->get_courses(array('recursive' => true, 'idonly' => true));
-
-    if (!empty($courses)) {
-        list($insql, $courseparams) = $DB->get_in_or_equal($courses, SQL_PARAMS_NAMED);
-        $extracoursesql = ' WHERE c.id ' . $insql;
-    } else {
-        // Don't show any courses if category is selected but category has no courses.
-        // This stuff really needs a rewrite!
-        $extracoursesql = ' WHERE c.id is null';
-    }
-}
-$coursesql .= $extracoursesql;
-$params = array_merge($params, $courseparams);
-$courselookup = $DB->get_records_sql($coursesql, $params);
-
+// Loop through and build up each context size.
 foreach ($cxsizes as $cxdata) {
     $contextlevel = $cxdata->contextlevel;
     $instanceid = $cxdata->instanceid;
     $contextsize = $cxdata->filessize;
     $contextbackupsize = (empty($cxdata->backupsize) ? 0 : $cxdata->backupsize);
+
     if ($contextlevel == CONTEXT_USER) {
         $usersizes[$instanceid] = $contextsize;
         $userbackupsizes[$instanceid] = $contextbackupsize;
@@ -137,6 +88,7 @@ foreach ($cxsizes as $cxdata) {
         $systembackupsize = $contextbackupsize;
         continue;
     }
+
     // Not a course, user, system, category, see it it's something that should be listed under a course
     // Modules & Blocks mostly.
     $path = explode('/', $cxdata->path);
@@ -169,9 +121,15 @@ foreach ($cxsizes as $cxdata) {
     }
 }
 $cxsizes->close();
-$sql = "SELECT c.id, c.shortname, c.category, ca.name FROM {course} c "
-       ."JOIN {course_categories} ca on c.category = ca.id".$extracoursesql;
-$courses = $DB->get_records_sql($sql, $courseparams);
+
+// $sql = "SELECT c.id, c.shortname, c.category, ca.name FROM {course} c "
+//        ."JOIN {course_categories} ca on c.category = ca.id" . $extracoursesql;
+// $courses = $DB->get_records_sql($sql, $courseparams);
+
+$courses = array();
+array_walk($courses, function($v, $k) use ($courses) {
+    $courses[$v->courseid] = $v;
+});
 
 $coursetable = new html_table();
 $coursetable->align = array('right', 'right', 'left');
