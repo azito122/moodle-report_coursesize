@@ -46,9 +46,9 @@ function report_coursesize_get_course_lookup($categoryid = null) {
 
     // This seems like an in-efficient method to filter by course categories as we are not excluding them from the main list.
     $coursesql = 'SELECT cx.id, c.shortname, c.category, ca.name, c.id as courseid ' .
-    'FROM {course} c ' .
-    ' JOIN {course_categories} ca on c.category = ca.id' .
-    ' INNER JOIN {context} cx ON cx.instanceid=c.id AND cx.contextlevel = ' . CONTEXT_COURSE
+    'FROM {course} c '
+    . ' LEFT JOIN {course_categories} ca on c.category = ca.id'
+    . ' INNER JOIN {context} cx ON cx.instanceid=c.id AND cx.contextlevel = ' . CONTEXT_COURSE
     . $extracoursesql;
 
     return $DB->get_records_sql($coursesql);

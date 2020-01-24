@@ -64,6 +64,7 @@ $coursesizes = array(); // To track a mapping of courseid to filessize.
 $coursebackupsizes = array(); // To track a mapping of courseid to backup filessize.
 $usersizes = array(); // To track a mapping of users to filesize.
 
+
 $systemsize = $systembackupsize = 0;
 
 // Loop through and build up each context size.
@@ -127,7 +128,7 @@ $cxsizes->close();
 // $courses = $DB->get_records_sql($sql, $courseparams);
 
 $courses = array();
-array_walk($courses, function($v, $k) use ($courses) {
+array_walk($courselookup, function($v, $k) use (&$courses) {
     $courses[$v->courseid] = $v;
 });
 
