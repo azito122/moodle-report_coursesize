@@ -78,11 +78,6 @@ $subsql = 'SELECT f.contextid, sum(f.filesize) as filessize' .
           ' FROM {files} f';
 $wherebackup = ' WHERE component like \'backup\' AND referencefileid IS NULL';
 $groupby = ' GROUP BY f.contextid';
-$reverse = 'reverse(cx2.path)';
-$poslast = $DB->sql_position("'/'", $reverse);
-$length = $DB->sql_length('cx2.path');
-$substr = $DB->sql_substr('cx2.path', 1, $length ." - " . $poslast);
-$likestr = $DB->sql_concat($substr, "'%'");
 
 $sizesql = 'SELECT cx.id, cx.contextlevel, cx.instanceid, cx.path, cx.depth,
             size.filessize, backupsize.filessize as backupsize' .
