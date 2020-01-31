@@ -113,7 +113,7 @@ class site {
         global $DB;
 
         $context = \context_coursecat::instance($coursecategory);
-        $coursecat = \coursecat::get($coursecategory);
+        $coursecat = core_course_category::get($coursecategory);
         $courses = $coursecat->get_courses(array('recursive' => true, 'idonly' => true));
 
         if (!empty($courses)) {
