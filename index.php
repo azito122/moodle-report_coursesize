@@ -63,7 +63,7 @@ $courselookup = report_coursesize_get_course_lookup($coursecategory);
 $coursesizes = array(); // To track a mapping of courseid to filessize.
 $coursebackupsizes = array(); // To track a mapping of courseid to backup filessize.
 $usersizes = array(); // To track a mapping of users to filesize.
-
+$files = array();
 
 $systemsize = $systembackupsize = 0;
 
@@ -71,24 +71,34 @@ $systemsize = $systembackupsize = 0;
 foreach ($cxsizes as $cxdata) {
     $contextlevel = $cxdata->contextlevel;
     $instanceid = $cxdata->instanceid;
-    $contextsize = $cxdata->filessize;
-    $contextbackupsize = (empty($cxdata->backupsize) ? 0 : $cxdata->backupsize);
+    // $contextsize = $cxdata->filessize;
+    // $contextbackupsize = (empty($cxdata->backupsize) ? 0 : $cxdata->backupsize);
 
+    // Update files array.
+    $hash = $cxdata->contenthash;
+    if (!array_key_exists($hash, $files)) {
+        $files[$hash] = array();
+    }
+    array_push($files[$hash], $cxdata->contextid);
+
+    // Update one of the context arrays.
     if ($contextlevel == CONTEXT_USER) {
-        $usersizes[$instanceid] = $contextsize;
-        $userbackupsizes[$instanceid] = $contextbackupsize;
+        if (!array_key_exists($instanceid, $usersizes)) {$usersizes[$instanceid] = array();}
+        $usersizes[$instanceid][$hash] = $cxdata->filesize;
+        // $userbackupsizes[$instanceid][$hash] = $cxdata->backupsize;
         continue;
     }
     if ($contextlevel == CONTEXT_COURSE) {
-        $coursesizes[$instanceid] = $contextsize;
-        $coursebackupsizes[$instanceid] = $contextbackupsize;
+        if (!array_key_exists($instanceid, $coursesizes)) {$coursesizes[$instanceid] = array();}
+        $coursesizes[$instanceid][$hash] = $cxdata->filesize;
+        // $coursebackupsizes[$instanceid] = $contextbackupsize;
         continue;
     }
-    if (($contextlevel == CONTEXT_SYSTEM) || ($contextlevel == CONTEXT_COURSECAT)) {
-        $systemsize = $contextsize;
-        $systembackupsize = $contextbackupsize;
-        continue;
-    }
+    // if (($contextlevel == CONTEXT_SYSTEM) || ($contextlevel == CONTEXT_COURSECAT)) {
+    //     $systemsize = $contextsize;
+    //     $systembackupsize = $contextbackupsize;
+    //     continue;
+    // }
 
     // Not a course, user, system, category, see it it's something that should be listed under a course
     // Modules & Blocks mostly.
@@ -104,31 +114,37 @@ foreach ($cxsizes as $cxdata) {
             $success = true; // Course found.
             // Record the files for the current context against the course.
             $courseid = $courselookup[$contextid]->courseid;
-            if (!empty($coursesizes[$courseid])) {
-                $coursesizes[$courseid] += $contextsize;
-                $coursebackupsizes[$courseid] += $contextbackupsize;
-            } else {
-                $coursesizes[$courseid] = $contextsize;
-                $coursebackupsizes[$courseid] = $contextbackupsize;
+            if (!array_key_exists($courseid, $coursesizes)) {
+                $coursesizes[$courseid] = array();
+                // $coursebackupsizes[$courseid] += $contextbackupsize;
             }
+            $coursesizes[$courseid][$hash] = $cxdata->filesize;
             break;
         }
     }
-    if (!$success) {
-        // Didn't find a course
-        // A module or block not under a course?
-        $systemsize += $contextsize;
-        $systembackupsize += $contextbackupsize;
-    }
+    // if (!$success) {
+    //     // Didn't find a course
+    //     // A module or block not under a course?
+    //     $systemsize += $contextsize;
+    //     $systembackupsize += $contextbackupsize;
+    // }
 }
 $cxsizes->close();
+
+echo '<pre>';
+print_r($files);
+die();
+
 
 // $sql = "SELECT c.id, c.shortname, c.category, ca.name FROM {course} c "
 //        ."JOIN {course_categories} ca on c.category = ca.id" . $extracoursesql;
 // $courses = $DB->get_records_sql($sql, $courseparams);
 
+// Modify the existing course lookup data to be indexed by courseid rather than categoryid.
+// This means we don't have to go back and do another database query for all the same data.
 $courses = array();
 array_walk($courselookup, function($v, $k) use (&$courses) {
+    $v->id = $v->courseid;
     $courses[$v->courseid] = $v;
 });
 
@@ -156,6 +172,9 @@ foreach ($coursesizes as $courseid => $size) {
     $totalsize = $totalsize + $size;
     $totalbackupsize  = $totalbackupsize + $backupsize;
     $course = $courses[$courseid];
+    // echo "<pre>";
+    // print_r($courses);
+    // die();
     $row = array();
     $row[] = '<a href="'.$CFG->wwwroot.'/course/view.php?id='.$course->id.'">' . $course->shortname . '</a>';
     $row[] = '<a href="'.$CFG->wwwroot.'/course/index.php?categoryid='.$course->category.'">' . $course->name . '</a>';

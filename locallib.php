@@ -22,16 +22,24 @@ function report_coursesize_get_context_sizes() {
     global $DB;
 
     // Generate a full list of context sitedata usage stats.
-    $subsql = 'SELECT f.contextid, sum(f.filesize) as filessize' .
+    $subsql = 'SELECT f.id, f.contenthash, f.contextid, f.filesize as filesize' .
     ' FROM {files} f';
     $wherebackup = ' WHERE component like \'backup\' AND referencefileid IS NULL';
     $groupby = ' GROUP BY f.contextid';
 
-    $sizesql = 'SELECT cx.id, cx.contextlevel, cx.instanceid, cx.path, cx.depth,
-    size.filessize, backupsize.filessize as backupsize' .
+    $sizesql = 'SELECT ' .
+    'cx.id as contextid, ' .
+    'cx.contextlevel, ' .
+    'cx.instanceid, ' .
+    'cx.path, ' .
+    'cx.depth, ' .
+    'files.filesize, ' .
+    'files.contenthash, ' .
+    'files.id as fileid, ' .
+    'backups.filesize as backupsize' .
     ' FROM {context} cx ' .
-    ' INNER JOIN ( ' . $subsql . $groupby . ' ) size on cx.id=size.contextid' .
-    ' LEFT JOIN ( ' . $subsql . $wherebackup . $groupby . ' ) backupsize on cx.id=backupsize.contextid' .
+    ' INNER JOIN ( ' . $subsql . ' ) files on cx.id=files.contextid' .
+    ' LEFT JOIN ( ' . $subsql . $wherebackup . ' ) backups on cx.id=backups.contextid' .
     ' ORDER by cx.depth ASC, cx.path ASC';
     return $DB->get_recordset_sql($sizesql);
 }
@@ -45,7 +53,7 @@ function report_coursesize_get_course_lookup($categoryid = null) {
     }
 
     // This seems like an in-efficient method to filter by course categories as we are not excluding them from the main list.
-    $coursesql = 'SELECT cx.id, c.shortname, c.category, ca.name, c.id as courseid ' .
+    $coursesql = 'SELECT cx.id, c.shortname, c.category, c.fullname, c.id as courseid ' .
     'FROM {course} c '
     . ' LEFT JOIN {course_categories} ca on c.category = ca.id'
     . ' INNER JOIN {context} cx ON cx.instanceid=c.id AND cx.contextlevel = ' . CONTEXT_COURSE
