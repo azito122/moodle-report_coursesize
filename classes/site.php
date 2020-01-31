@@ -156,8 +156,16 @@ class site {
      */
     private static function get_total_site_usage() {
         global $CFG;
+        // Check if the path ends with a "/" otherwise an exception will be thrown
+        $sitedatadir = $CFG->dataroot;
+        if (is_dir($sitedatadir)) {
+            // Only append a "/" if it doesn't already end with one
+            if (substr($sitedatadir, -1) !== '/') {
+                $sitedatadir .= '/';
+            }
+        }
 
-        $bytes = get_directory_size($CFG->dataroot);
+        $bytes = get_directory_size($sitedatadir);
         return ceil($bytes / 1048576);
     }
 
