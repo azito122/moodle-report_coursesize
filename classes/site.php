@@ -213,7 +213,7 @@ class site {
                 (SELECT f.contextid, SUM(f.filesize) as filessize FROM {files} f GROUP BY f.contextid) size
             ON cx.id=size.contextid LEFT JOIN
                 (SELECT f.contextid, SUM(f.filesize) as filessize FROM {files} f
-                WHERE f.component LIKE 'backup' GROUP BY f.contextid) backupsize
+                WHERE f.component LIKE 'backup' AND referencefileid IS NULL GROUP BY f.contextid) backupsize
             ON cx.id=backupsize.contextid ORDER by cx.depth ASC, cx.path ASC";
         $contextsizes = $DB->get_recordset_sql($contextsizesql);
         foreach ($contextsizes as $contextdata) {
