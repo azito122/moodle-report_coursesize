@@ -26,9 +26,9 @@ namespace report_coursesize\table;
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir . "/tablelib.php");
+class user_table extends flexible_table {
+    protected $downloadparam = 'userdownload';
 
-class user_table extends \flexible_table {
     public function __construct() {
         parent::__construct("report-coursesize-users");
         $this->init();

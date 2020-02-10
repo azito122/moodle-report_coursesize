@@ -1,18 +1,18 @@
-@report @report_coursesize @_file_upload
+@report @report_coursesize
 Feature: Course size report calculates correct information
 
   Background:
-    Given the following "users" exist:
-      | username | firstname | lastname | email |
-      | teacher1 | Teacher | 1 | teacher1@example.com |
-    And the following "courses" exist:
+    Given the following "categories" exist:
+      | name | parent |
+      |
+    Given the following "courses" exist:
       | fullname | shortname | category |
-      | Course 1 | C1 | 0 |
-      | Course 2 | C2 | 0 |
+      | Course 1 | C1        | 0        |
+      | Course 2 | C2        | 0        |
     And the following "course enrolments" exist:
-      | user | course | role |
-      | teacher1 | C1 | editingteacher |
-      | teacher1 | C2 | editingteacher |
+      | user     | course | role           |
+      | teacher1 | C1     | editingteacher |
+      | teacher1 | C2     | editingteacher |
     And I log in as "teacher1"
     And I follow "Course 1"
     And I turn editing mode on

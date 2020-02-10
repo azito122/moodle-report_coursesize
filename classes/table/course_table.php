@@ -26,10 +26,11 @@ namespace report_coursesize\table;
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir . "/tablelib.php");
 require_once($CFG->dirroot . '/report/coursesize/locallib.php');
 
-class course_table extends \flexible_table {
+class course_table extends flexible_table {
+    protected $downloadparam = 'coursedownload';
+
     public function __construct($categoryid) {
         parent::__construct("report-coursesize-category-{$categoryid}");
         $this->init($categoryid);
