@@ -27,35 +27,77 @@ require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->libdir.'/tablelib.php');
 require_once('locallib.php');
 
-admin_externalpage_setup('reportcoursesize');
+admin_externalpage_setup('report_coursesize');
 
-// Dirty hack to filter by coursecategory - not very efficient.
-$coursecategory = optional_param('category', 0, PARAM_INT);
-$download       = optional_param('download', '', PARAM_ALPHA);
-$userdownload   = optional_param('userdownload', '', PARAM_ALPHA);
+/// DEBUGGG_--------------------------------------------------------------------------------
+// echo '<pre>';
+$task = new \report_coursesize\task\build_data_task();
+$task->set_custom_data(
+    array(
+        'batch_limit'       => 100,
+        'file_records_done' => false,
+        'processed_records' => array(),
+        'files'             => array(),
+        // 'contexts'          => array(),
+        // 'systemsize'        => 0,
+        // 'systembackupsize'  => $data->systembackupsize,
+    )
+);
+// \core\task\manager::queue_adhoc_task($task);
+// $task->execute();
+
+$results  = \cache::make('report_coursesize', 'results');
+// $cache    = \cache::make('report_coursesize', 'in_progress');
+
+// var_dump($results->get('updated'));
+// var_dump($results->get('sizes'));
+// var_dump($cache->get('files'));
+// var_dump($cache->get('contexts'));
+
+// $category = \core_course_category::get(3);
+// var_dump($category->get_all_children_ids());
+// die();
+// -----------------------------------------------------------------------------------------
+
+$params                   = new \stdClass();
+$params->categoryid       = optional_param('categoryid', 0, PARAM_INT);
+$params->showempty        = optional_param('showempty', false, PARAM_BOOL);
+$params->coursedownload   = optional_param('coursedownload', '', PARAM_ALPHA);
+$params->categorydownload = optional_param('categorydownload', '', PARAM_ALPHA);
+$params->userdownload     = optional_param('userdownload', '', PARAM_ALPHA);
 
 // Load results.
-$results = \report_coursesize\site::get_results($coursecategory);
+$resultsmanager = new \report_coursesize\results_manager;
+$sizes          = $resultsmanager->get_sizes($params->categoryid);
 
-$systemsizereadable = number_format(ceil($results->contexts->systemsize / 1048576)) . "MB";
-$systembackupreadable = number_format(ceil($results->contexts->systembackupsize / 1048576)) . "MB";
+if (!isset($sizes->contexts) && !empty($report->contexts)) {
+    die();
+}
+
+$systemsizereadable   = get_string('sizeinmb', 'report_coursesize', report_coursesize_bytes_to_megabytes($sizes->systemsize));
+$systembackupreadable = get_string('sizeinmb', 'report_coursesize', report_coursesize_bytes_to_megabytes($sizes->systembackupsize));
 
 // Setup the course table.
-$table = new \report_coursesize\site_table($coursecategory);
-$table->setup();
-$table->is_downloading($download, 'coursesizes', 'courses');
+$coursetable = new \report_coursesize\table\course_table($params->categoryid);
+$coursetable->setup();
+$coursetable->is_downloading($params->coursedownload, 'coursesizes', 'courses');
+
+// Setup category table.
+$categorytable = new \report_coursesize\table\category_table($params->categoryid);
+$categorytable->setup();
+$categorytable->is_downloading($params->categorydownload, 'categorysizes', 'categories');
 
 // Setup the user table.
-$usertable = new \report_coursesize\user_table();
+$usertable = new \report_coursesize\table\user_table();
 $usertable->setup();
-$usertable->is_downloading($userdownload, 'usersizes', 'users');
+// $usertable->is_downloading($userdownload, 'usersizes', 'users');
 
-if (!$table->is_downloading() && !$usertable->is_downloading()) {
+if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$usertable->is_downloading()) {
     print $OUTPUT->header();
-    if (empty($coursecat)) {
+    if (empty($params->categoryid)) {
         print $OUTPUT->heading(get_string("sitefilesusage", 'report_coursesize'));
-        print '<strong>' . get_string("totalsitedata", 'report_coursesize', number_format($results->total_site_usage) . " MB") . '</strong> ';
-        print get_string("sizerecorded", "report_coursesize", date("Y-m-d H:i", $results->date)) . "<br/><br/>\n";
+        print '<strong>' . get_string("totalsitedata", 'report_coursesize', number_format($sizes->total_site_usage) . " MB") . '</strong> ';
+        print get_string("sizerecorded", "report_coursesize", date("Y-m-d H:i", $resultsmanager->updated)) . "<br/><br/>\n";
         print get_string('catsystemuse', 'report_coursesize', $systemsizereadable) . "<br/>";
         print get_string('catsystembackupuse', 'report_coursesize', $systembackupreadable) . "<br/>";
         if (!empty($CFG->filessizelimit)) {
@@ -64,37 +106,44 @@ if (!$table->is_downloading() && !$usertable->is_downloading()) {
     }
 
     $heading = get_string('coursesize', 'report_coursesize');
-    if (!empty($coursecat)) {
-        $heading .= " - ".$coursecat->name;
+    if (!empty($params->categoryid)) {
+        // $heading .= " - ".$coursecat->name;
     }
     print $OUTPUT->heading($heading);
     $desc = get_string('coursesize_desc', 'report_coursesize');
 
-    if (!REPORT_COURSESIZE_SHOWEMPTYCOURSES) {
+    if (!$params->showempty) {
         $desc .= ' '. get_string('emptycourseshidden', 'report_coursesize');
     }
     print $OUTPUT->box($desc);
 }
 
 // Display the course size table.
-if (!$usertable->is_downloading()) {
-    $table->start_output();
-    $table->build_table($results->summary);
-    $table->finish_output();
+if (!$categorytable->is_downloading()) {
+    $coursetable->start_output();
+    $coursetable->build_table($sizes->contexts->courses);
+    $coursetable->finish_output();
+}
+
+// Display the category size table.
+if (!$coursetable->is_downloading()) {
+    $categorytable->start_output();
+    $categorytable->build_table($sizes->contexts->categories);
+    $categorytable->finish_output();
 }
 
 // Display the user size table.
-if (!$table->is_downloading() && $coursecategory == 0) {
-    if (!$usertable->is_downloading()) {
-        print $OUTPUT->heading(get_string('userstopnum', 'report_coursesize', REPORT_COURSESIZE_NUMBEROFUSERS));
-    }
+// if (!$coursetable->is_downloading() && $coursecategory == 0) {
+    // if (!$usertable->is_downloading()) {
+    //     print $OUTPUT->heading(get_string('userstopnum', 'report_coursesize', REPORT_COURSESIZE_NUMBEROFUSERS));
+    // }
 
-    // Build and display table.
-    $usertable->start_output();
-    $usertable->build_table($results->users);
-    $usertable->finish_output();
-}
+    // // Build and display table.
+    // $usertable->start_output();
+    // $usertable->build_table($sizes->users);
+    // $usertable->finish_output();
+// }
 
-if (!$table->is_downloading() && !$usertable->is_downloading()) {
+if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$usertable->is_downloading()) {
     print $OUTPUT->footer();
 }

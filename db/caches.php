@@ -25,7 +25,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $definitions = array(
-    'site' => array(
+    'results' => array(
+        'mode' => cache_store::MODE_APPLICATION
+    ),
+    'in_progress' => array(
         'mode' => cache_store::MODE_APPLICATION
     )
 );

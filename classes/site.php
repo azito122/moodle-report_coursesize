@@ -27,28 +27,50 @@ namespace report_coursesize;
 defined('MOODLE_INTERNAL') || die();
 
 class site {
-
     /**
      * Attempt to load the cache. If it's older than 24 hours, invalidate it if it exists.
+     *
      * @param int $coursecategory The coursecategory, or 0 for the site.
      *
      * @return array
      */
-    public static function get_results($coursecategory = 0) {
-        $cache = \cache::make('report_coursesize', 'site');
-        $results = $cache->get($coursecategory);
-        if ($results === false || $results->date < (time() - (1 * DAYSECS))) {
-            $results = new \stdClass();
-            $results->date = time();
-            $results->total_site_usage = self::get_total_site_usage();
-            $results->contexts = self::get_context_sizes($coursecategory);
-            $results->summary = self::get_course_summaries($results->contexts, $coursecategory);
-            if ($coursecategory === 0) {
-                $results->users = self::get_users($results->contexts);
-            }
-            $cache->set($coursecategory, $results);
+    public function get_results($coursecategory = 0) {
+        $cache = \cache::make('report_coursesize', 'results');
+        $date = $cache->get('date');
+        $contexts = $cache->get('contexts');
+        // $results  = $cache->get('results');
+        $lifetime = get_config('report_coursesize', 'cache_lifetime');
+
+        $results = new \stdClass();
+        $results->contexts = $contexts;
+        if ($contexts === false || $date < (time() - $lifetime)) {
+            // $results                   = new \stdClass();
+            // $results->date             = time();
+            // $results->total_site_usage = self::get_total_site_usage();
+            // $results->contexts         = $this->get_context_sizes();
+            // $results->summary          = self::get_course_summaries($results->contexts, $coursecategory);
+            // // if ($coursecategory === 0) {
+            //     $results->users = self::get_users($results->contexts);
+            // // }
+            // // $cache->set($coursecategory, $results);
+            // $cache->set('results', $results);
         }
         return $results;
+    }
+
+    private static function get_context_sizes() {
+        $cache    = \cache::make('report_coursesize', 'context_sizes');
+        $done     = $cache->get('done');
+        $lifetime = get_config('report_coursesize', 'cache_lifetime');
+
+        if ($done === false || $done->date < (time() - $lifetime)) {
+            // If there is no completed contextsizes obj, or if it is out of date,
+            // trigger a new adhoc task to build/rebuild the data.
+            $task = new \report_coursesize\task\build_data_task();
+            \core\task\manager::queue_adhoc_task($task);
+        }
+
+        return $done;
     }
 
     /**
@@ -82,7 +104,7 @@ class site {
      */
     private static function get_course_summaries($contexts, $coursecategory) {
         // Sort the course sizes now.
-        arsort($contexts->coursesizes);
+        arsort($contexts->courses);
 
         // Get the course metadata.
         $courses = self::get_courses($coursecategory);
@@ -170,113 +192,20 @@ class site {
     }
 
     /**
-     * Course lookup table for get_context_sizes().
-     * @param int $coursecategory Restrict query based on category.
-     *
-     * @return array
-     */
-    private static function get_course_lookup_table($coursecategory=0) {
-        global $DB;
-
-        $coursesql = "SELECT cx.id, c.id as courseid, c.shortname FROM {course} c INNER JOIN {context} cx
-            ON cx.instanceid=c.id AND cx.contextlevel = :contextlevel";
-        $params = array('contextlevel' => CONTEXT_COURSE);
-
-        if ($coursecategory !== 0) {
-            list($courseparams, $extracoursesql) = self::get_course_category_sql($coursecategory);
-            $coursesql .= $extracoursesql;
-            $params = array_merge($params, $courseparams);
-        }
-
-        // Build the course lookup table.
-        $courselookup = $DB->get_records_sql($coursesql, $params);
-        return $courselookup;
-    }
-
-    /**
-     * Calculate file size by context.
-     * @param int $coursecategory Restrict query based on category.
-     *
-     * @return array
-     */
-    private static function get_context_sizes($coursecategory = 0) {
-        global $DB;
-
-        // Setup storage.
-        $contexts                    = new \stdClass();
-        $contexts->coursesizes       = array();
-        $contexts->coursebackupsizes = array();
-        $contexts->usersizes         = array();
-        $contexts->userbackupsizes   = array();
-        $contexts->systemsize        = 0;
-        $contexts->systembackupsize  = 0;
-
-        // Build the lookup table.
-        $courselookup = self::get_course_lookup_table($coursecategory);
-
-        // Find all files and organize by context.
-        $contextsizesql = "SELECT cx.id, cx.contextlevel, cx.instanceid, cx.path, cx.depth,
-            size.filessize, backupsize.filessize AS backupsize
-            FROM {context} cx INNER JOIN
-                (SELECT f.contextid, SUM(f.filesize) as filessize FROM {files} f GROUP BY f.contextid) size
-            ON cx.id=size.contextid LEFT JOIN
-                (SELECT f.contextid, SUM(f.filesize) as filessize FROM {files} f
-                WHERE f.component LIKE 'backup' AND referencefileid IS NULL GROUP BY f.contextid) backupsize
-            ON cx.id=backupsize.contextid ORDER by cx.depth ASC, cx.path ASC";
-        $contextsizes = $DB->get_recordset_sql($contextsizesql);
-        foreach ($contextsizes as $contextdata) {
-            // Set backup size to 0 if it's not set.
-            $contextbackupsize = (empty($contextdata->backupsize) ? 0 : $contextdata->backupsize);
-            switch($contextdata->contextlevel) {
-                case CONTEXT_USER:
-                    $contexts->usersizes[$contextdata->instanceid] = $contextdata->filessize;
-                    $contexts->userbackupsizes[$contextdata->instanceid] = $contextbackupsize;
-                    break;
-                case CONTEXT_COURSE:
-                    $contexts->coursesizes[$contextdata->instanceid] = $contextdata->filessize;
-                    $contexts->coursebackupsizes[$contextdata->instanceid] = $contextbackupsize;
-                    break;
-                case CONTEXT_COURSECAT:
-                case CONTEXT_SYSTEM:
-                    $contexts->systemsize += $contextdata->filessize;
-                    $contexts->systembackupsize += $contextbackupsize;
-                    break;
-                default:
-                    // Not a course, user, system, category, see it it's something that should be listed under a course
-                    // Modules & Blocks mostly.
-                    $findcourse = self::find_course_from_context($contextdata->path, $courselookup);
-                    if (!$findcourse) {
-                        $contexts->systemsize += $contextdata->filessize;
-                        $contexts->systembackupsize += $contextbackupsize;
-                    } else {
-                        if (!isset($contexts->coursesizes[$findcourse])) {
-                            $contexts->coursesizes[$findcourse] = 0;
-                        }
-                        $contexts->coursesizes[$findcourse] += $contextdata->filessize;
-                        $contexts->coursebackupsizes[$findcourse] = $contextbackupsize;
-                    }
-                    break;
-            }
-        }
-        $contextsizes->close();
-        return $contexts;
-    }
-
-    /**
      * Find a course by traversing the file's context path.
      * @param string $path The context path.
      * @param array $courselookup Course lookup table.
      *
      * @return int, or false if not found.
      */
-    private static function find_course_from_context($path, $courselookup) {
+    private function find_course_from_context($path) {
         $contextids = explode('/', $path);
         array_shift($contextids); // Get rid of the leading (empty) array item.
         array_pop($contextids); // Trim the contextid of the current context itself.
         while (count($contextids)) {
             $contextid = array_pop($contextids);
-            if (isset($courselookup[$contextid])) {
-                return $courselookup[$contextid]->courseid;
+            if (isset($this->courselookup[$contextid])) {
+                return $this->courselookup[$contextid];
             }
         }
 

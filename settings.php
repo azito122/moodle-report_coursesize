@@ -24,9 +24,16 @@
 
 defined('MOODLE_INTERNAL') || die;
 
-$ADMIN->add('reports', new admin_externalpage('reportcoursesize', get_string('pluginname', 'report_coursesize'),
+$ADMIN->add('reports', new admin_externalpage('report_coursesize', get_string('pluginname', 'report_coursesize'),
                                               "$CFG->wwwroot/report/coursesize/index.php", 'report/coursesize:view'));
 
-// No report settings.
-$settings = null;
-
+if ($ADMIN->fulltree) {
+    $settings->add(
+        new admin_setting_configtext('report_coursesize/batch_limit',
+            get_string('settings:batch_limit', 'report_coursesize'),
+            get_string('settings:batch_limit:description', 'report_coursesize'),
+            100,
+            PARAM_INT
+        )
+    );
+}

@@ -44,3 +44,7 @@ $string['sharedusage'] = 'Shared Usage';
 $string['sharedusagecourse'] = 'Approx {$a} is shared with other courses.';
 $string['sizeinmb'] = '{$a} MB';
 $string['privacy:metadata'] = 'The Course size plugin does not store any personal data.';
+
+$string['table:column_header:total'] = 'Total';
+$string['table:column_header:unique'] = 'Unique';
+$string['table:column_header:backup'] = 'Backup';
