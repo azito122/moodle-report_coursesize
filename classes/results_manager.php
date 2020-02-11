@@ -28,7 +28,7 @@ class results_manager {
 
         // If we're missing data, or if data is stale, schedule a new build.
         if ($sizes === false || $this->updated < (time() - $lifetime)) {
-            if (!\report_coursesize\task\build_data_task::get_progress()) {
+            if (!\report_coursesize\task\build_data_task::get_build_progress()) {
                 \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
             }
         }
