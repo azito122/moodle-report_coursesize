@@ -72,15 +72,12 @@ class build_data_task extends \core\task\adhoc_task {
         $done = false;
         switch ($data->progress->stage) {
             case 1:
-                echo "\n====== STAGE ONE ======= \n";
                 $data = $this->execute_stage_one($data);
                 break;
             case 2:
-                echo "\n====== STAGE TWO ======= \n";
                 $data = $this->execute_stage_two($data);
                 break;
             case 3:
-                echo "\n====== STAGE THREE ======= \n";
                 $this->finish_execution($data);
                 $done = true;
                 break;

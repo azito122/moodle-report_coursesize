@@ -28,15 +28,9 @@ class results_manager {
 
         // If we're missing data, or if data is stale, schedule a new build.
         if ($sizes === false || $this->updated < (time() - $lifetime)) {
-            // $task = new \report_coursesize\task\build_data_task();
-            // $task->set_custom_data(
-            //     array(
-            //         'file_records_done' => false,
-            //         'batch_limit'       => get_config('report_coursesize', 'batch_limit'),
-            //         'processed_records' => array(),
-            //     )
-            // );
-            \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
+            if (!\report_coursesize\task\build_data_task::get_progress()) {
+                \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
+            }
         }
 
         if (is_numeric($categoryid) && !empty($categoryid)) {
