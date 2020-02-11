@@ -36,4 +36,13 @@ if ($ADMIN->fulltree) {
             PARAM_INT
         )
     );
+
+    $settings->add(
+        new admin_setting_configtext('report_coursesize/cache_lifetime',
+            get_string('settings:cache_lifetime', 'report_coursesize'),
+            get_string('settings:cache_lifetime:description', 'report_coursesize'),
+            100,
+            PARAM_FLOAT
+        )
+    );
 }

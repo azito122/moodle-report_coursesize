@@ -31,19 +31,19 @@ admin_externalpage_setup('report_coursesize');
 
 /// DEBUGGG_--------------------------------------------------------------------------------
 // echo '<pre>';
-$task = new \report_coursesize\task\build_data_task();
-$task->set_custom_data(
-    array(
-        'batch_limit'       => 100,
-        'file_records_done' => false,
-        'processed_records' => array(),
-        'files'             => array(),
-        // 'contexts'          => array(),
-        // 'systemsize'        => 0,
-        // 'systembackupsize'  => $data->systembackupsize,
-    )
-);
-// \core\task\manager::queue_adhoc_task($task);
+// $task = new \report_coursesize\task\build_data_task();
+// $task->set_custom_data(
+//     array(
+//         'batch_limit'       => 100,
+//         'file_records_done' => false,
+//         'processed_records' => array(),
+//         'files'             => array(),
+//         // 'contexts'          => array(),
+//         // 'systemsize'        => 0,
+//         // 'systembackupsize'  => $data->systembackupsize,
+//     )
+// );
+// \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
 // $task->execute();
 
 $results  = \cache::make('report_coursesize', 'results');
@@ -56,6 +56,12 @@ $results  = \cache::make('report_coursesize', 'results');
 
 // $category = \core_course_category::get(3);
 // var_dump($category->get_all_children_ids());
+// $tasks    = \core\task\manager::get_adhoc_tasks('\report_coursesize\task\build_data_task');
+// $build    = $tasks[array_keys($tasks)[0]];
+// $data     = $build->get_custom_data();
+// $progress = $data->progress;
+// echo 'Stage ' . $progress->stage . ' of ' . $progress->stagetot;
+// echo "\nStep " . $progress->step . ' of ' . $progress->steptot;
 // die();
 // -----------------------------------------------------------------------------------------
 
@@ -70,7 +76,14 @@ $params->userdownload     = optional_param('userdownload', '', PARAM_ALPHA);
 $resultsmanager = new \report_coursesize\results_manager;
 $sizes          = $resultsmanager->get_sizes($params->categoryid);
 
-if (!isset($sizes->contexts) && !empty($report->contexts)) {
+if (!isset($sizes->contexts) || empty($sizes->contexts)) {
+    print $OUTPUT->header();
+    print get_string('no_results', 'report_coursesize');
+    if ($progress = \report_coursesize\task\build_data_task::get_build_progress()) {
+        print '<h5>' . get_string('build_status', 'report_coursesize') . '</h5>';
+        print get_string('build_status_active', 'report_coursesize', $progress);
+    }
+    print $OUTPUT->footer();
     die();
 }
 
@@ -94,6 +107,14 @@ $usertable->setup();
 
 if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$usertable->is_downloading()) {
     print $OUTPUT->header();
+
+    print '<h5>' . get_string('build_status', 'report_coursesize') . '</h5>';
+    if ($progress = \report_coursesize\task\build_data_task::get_build_progress()) {
+        print get_string('build_status_active', 'report_coursesize', $progress);
+    } else {
+        print get_string('build_status_none', 'report_coursesize');
+    }
+
     if (empty($params->categoryid)) {
         print $OUTPUT->heading(get_string("sitefilesusage", 'report_coursesize'));
         print '<strong>' . get_string("totalsitedata", 'report_coursesize', number_format($sizes->total_site_usage) . " MB") . '</strong> ';

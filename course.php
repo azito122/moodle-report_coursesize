@@ -27,7 +27,7 @@ require_once($CFG->libdir.'/adminlib.php');
 
 $courseid = required_param('id', PARAM_INT);
 
-admin_externalpage_setup('reportcoursesize');
+admin_externalpage_setup('report_coursesize');
 
 $course = $DB->get_record('course', array('id' => $courseid));
 

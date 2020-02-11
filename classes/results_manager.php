@@ -24,19 +24,19 @@ class results_manager {
         $this->updated = $cache->get('updated');
         $sizes         = $cache->get('sizes');
 
-        $lifetime = get_config('report_coursesize', 'cache_lifetime');
+        $lifetime = (int) get_config('report_coursesize', 'cache_lifetime') * 3600;
 
         // If we're missing data, or if data is stale, schedule a new build.
-        if ($sizes->contexts === false || $this->updated < (time() - $lifetime)) {
-            $task = new \report_coursesize\task\build_data_task();
-            $task->set_custom_data(
-                array(
-                    'file_records_done' => false,
-                    'batch_limit'       => get_config('report_coursesize', 'batch_limit'),
-                    'processed_records' => array(),
-                )
-            );
-            \core\task\manager::queue_adhoc_task($task, true);
+        if ($sizes === false || $this->updated < (time() - $lifetime)) {
+            // $task = new \report_coursesize\task\build_data_task();
+            // $task->set_custom_data(
+            //     array(
+            //         'file_records_done' => false,
+            //         'batch_limit'       => get_config('report_coursesize', 'batch_limit'),
+            //         'processed_records' => array(),
+            //     )
+            // );
+            \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
         }
 
         if (is_numeric($categoryid) && !empty($categoryid)) {
