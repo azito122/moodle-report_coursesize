@@ -45,11 +45,6 @@ class build_data_task extends \core\task\adhoc_task {
         $task->set_next_run_time(time() + 1);
         $task->set_custom_data((object)
             array(
-                'iteration_limit'       => get_config('report_coursesize', 'iteration_limit') ?? 100,
-                'processed_records' => $data->processed_records ?? array(),
-                'contexts'          => $data->contexts ?? new \stdClass(),
-                'systemsize'        => $data->systemsize ?? 0,
-                'systembackupsize'  => $data->systembackupsize ?? 0,
                 'progress'          => $data->progress ?? (object) array(
                     'stage'    => 1,
                     'stagetot' => 2,
@@ -69,10 +64,10 @@ class build_data_task extends \core\task\adhoc_task {
 
         switch ($data->progress->stage) {
             case 1:
-                $data = $this->process_core_file_records($data);
+                $data = $this->build_file_mappings($data);
                 break;
             case 2:
-                $data = $this->execute_stage_two($data);
+                $data = $this->build_context_sizes($data);
                 break;
             case 3:
                 $this->execute_final($data);
@@ -83,14 +78,16 @@ class build_data_task extends \core\task\adhoc_task {
         \core\task\manager::queue_adhoc_task($next);
     }
 
-    protected function process_core_file_records($data) {
-        $builder = new \report_coursesize\files_table_builder($data->core_file_records_processed, $data->iteration_limit);
-        $isdone  = $builder->process();
+    protected function get_iteration_limit() {
+        return get_config('report_coursesize', 'iteration_limit') ?? 100;
+    }
 
-        $data->core_file_records_processed = $builder->processed_records;
-        $data->progress->step              = count($data->core_file_records_processed);
+    protected function build_file_mappings($data) {
+        $filemappings         = new \report_coursesize\file_mappings();
+        $processedrecordids   = $filemappings->process($this->get_iteration_limit());
+        $data->progress->step = count($processedrecordids);
 
-        if ($isdone) {
+        if (count($processedrecordids) == 0) {
             $data->progress->stage = 2;
             $data->progress->step  = 0;
         }
@@ -98,50 +95,26 @@ class build_data_task extends \core\task\adhoc_task {
         return $data;
     }
 
-    protected function execute_stage_two($data) {
-        global $DB;
+    protected function build_context_sizes($data) {
+        $contextsizes   = new \report_coursesize\context_sizes();
+        $mappingsleft   = $contextsizes->process_file_mappings($this->get_iteration_limit());
+        // $data->progress->step = count($processedrecordids);
 
-        // Update contexts/sizes.
-        $cache = \cache::make('report_coursesize', 'in_progress');
-        $contexts = (object) array(
-            'courses'    => $cache->get('course_sizes'),
-            'categories' => $cache->get('category_sizes'),
-            'users'      => $cache->get('user_sizes'),
-        );
-
-        $contextsizer = new \report_coursesize\context_sizes_builder($contexts, $data->iteration_limit);
-
-        $cache->set('course_sizes', $contextsizer->courses);
-        $cache->set('category_sizes', $contextsizer->categories);
-        $cache->set('user_sizes', $contextsizer->users);
-
-        $data->systemsize       = $contextsizer->systemsize;
-        $data->systembackupsize = $contextsizer->systembackupsize;
-
-        if ($DB->count_records('report_coursesizes_files') == 0) {
+        if ($mappingsleft == 0) {
             $data->progress->stage = 3;
+            $data->progress->step  = 0;
         }
 
         return $data;
     }
 
-    protected function execute_final($data) {
-        $cache = \cache::make('report_coursesize', 'in_progress');
-        $contexts = (object) array(
-            'courses'    => $cache->get('course_sizes'),
-            'categories' => $cache->get('category_sizes'),
-            'users'      => $cache->get('user_sizes'),
-        );
+    protected function execute_final() {
+        $contextsizes = new \report_coursesize\context_sizes();
 
-        $cache->delete('course_sizes');
-        $cache->delete('category_sizes');
-        $cache->delete('user_sizes');
+        $sizes = $contextsizes->get_sizes();
+        $contextsizes->clear_in_progress();
 
-        \report_coursesize\results_manager::update((object) array(
-            'contexts'         => $contexts,
-            'systemsize'       => $data->systemsize,
-            'systembackupsize' => $data->systembackupsize
-        ));
+        \report_coursesize\results_manager::update($sizes);
     }
 
     public static function get_build_progress() {

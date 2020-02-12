@@ -46,9 +46,13 @@ admin_externalpage_setup('report_coursesize');
 // \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
 // $task->execute();
 
-$results  = \cache::make('report_coursesize', 'results');
-// $cache    = \cache::make('report_coursesize', 'in_progress');
+// $results  = \cache::make('report_coursesize', 'results');
+$cache    = \cache::make('report_coursesize', 'in_progress');
 
+// $cache->delete('course_sizes');
+// $cache->delete('category_sizes');
+// $cache->delete('user_sizes');
+var_dump($cache->get('course_sizes'));
 // var_dump($results->get('updated'));
 // var_dump($results->get('sizes'));
 // var_dump($cache->get('files'));
@@ -62,7 +66,7 @@ $results  = \cache::make('report_coursesize', 'results');
 // $progress = $data->progress;
 // echo 'Stage ' . $progress->stage . ' of ' . $progress->stagetot;
 // echo "\nStep " . $progress->step . ' of ' . $progress->steptot;
-// die();
+die();
 // -----------------------------------------------------------------------------------------
 
 $params                   = new \stdClass();

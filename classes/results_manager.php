@@ -22,29 +22,40 @@ class results_manager {
     public function get_sizes($categoryid) {
         $cache         = \cache::make('report_coursesize', 'results');
         $this->updated = $cache->get('updated');
-        $sizes         = $cache->get('sizes');
+        $sizes         = (object) array(
+            'course_sizes'   => $cache->get('course_sizes'),
+            'category_sizes' => $cache->get('category_sizes'),
+            'user_sizes'     => $cache->get('user_sizes'),
+            'system_sizes'   => $cache->get('system_sizes'),
+        );
 
         $lifetime = (int) get_config('report_coursesize', 'cache_lifetime') * 3600;
 
         // If we're missing data, or if data is stale, schedule a new build.
-        if ($sizes === false || $this->updated < (time() - $lifetime)) {
+        if (
+            $sizes->course_sizes == false ||
+            $sizes->category_sizes == false ||
+            $sizes->user_sizes == false ||
+            $sizes->system_sizes == false ||
+            $this->updated < (time() - $lifetime)
+        ) {
             if (!\report_coursesize\task\build_data_task::get_build_progress()) {
                 \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
             }
         }
 
         if (is_numeric($categoryid) && !empty($categoryid)) {
-            $filteredcontexts = $cache->get('filteredcontexts');
+            $filteredcontexts = $cache->get('filteredcontexts') ?? array();
 
             if ($filteredcontexts !== false && array_key_exists($categoryid, $filteredcontexts)) {
                 $filteredbycat = $filteredcontexts[$categoryid];
             } else {
                 $allowedcatids = $this->get_child_category_ids($categoryid);
 
-                $filteredbycat             = new \stdClass();
-                $filteredbycat->courses    = array();
-                $filteredbycat->categories = array();
-                $filteredbycat->users      = $sizes->contexts->users;
+                $filteredbycat                 = new \stdClass();
+                $filteredbycat->course_sizes   = array();
+                $filteredbycat->category_sizes = array();
+                $filteredbycat->user_sizes     = $sizes->contexts->users;
 
                 foreach ($sizes->contexts->courses as $course) {
                     if (in_array($course->category, $allowedcatids)) {
@@ -63,7 +74,9 @@ class results_manager {
                 $cache->set('filteredcontexts', $filteredcontexts);
             }
 
-            $sizes->contexts = $filteredbycat;
+            $sizes->course_sizes   = $filteredbycat->course_sizes;
+            $sizes->category_sizes = $filteredbycat->category_sizes;
+            $sizes->user_sizes     = $filteredbycat->user_sizes;
         }
 
         return $sizes;
@@ -77,23 +90,14 @@ class results_manager {
     public static function update($sizes) {
         $cache = \cache::make('report_coursesize', 'results');
 
-        if (
-            !is_object($sizes) ||
-            empty($sizes) ||
-            !property_exists($sizes, 'contexts') ||
-            empty($sizes->contexts) ||
-            !property_exists($sizes, 'systemsize') ||
-            empty($sizes->systemsize) ||
-            !property_exists($sizes, 'systembackupsize') ||
-            empty($sizes->systembackupsize)
-        ) {
-            return false;
-        }
-
-        $sizes->total_site_usage = self::get_total_site_usage();
+        $total_site_usage = self::get_total_site_usage();
 
         $cache->set('updated', time());
-        $cache->set('sizes', $sizes);
+        $cache->set('course_sizes', $sizes->course_sizes);
+        $cache->set('category_sizes', $sizes->category_sizes);
+        $cache->set('user_sizes', $sizes->user_sizes);
+        $cache->set('system_sizes', $sizes->system_sizes);
+        $cache->set('total_site_usage', $total_site_usage);
     }
 
     /**

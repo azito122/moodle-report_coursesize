@@ -25,13 +25,39 @@
 defined('MOODLE_INTERNAL') || die();
 
 function xmldb_report_coursesize_upgrade($oldversion) {
-    global $CFG;
+    global $CFG, $DB;
+
+    $dbman = $DB->get_manager();
 
     if ($oldversion < 2017090600) {
         // Settings deprecated in favor of the Cache API.
         unset_config('filessize', 'report_coursesize');
         unset_config('filessizeupdated', 'report_coursesize');
         upgrade_plugin_savepoint(true, 2017090600, 'report', 'coursesize');
+    }
+
+    if ($oldversion < 2019052800) {
+
+        // Define table report_coursesize_files to be created.
+        $table = new xmldb_table('report_coursesize_files');
+
+        // Adding fields to table report_coursesize_files.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '20', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('contenthash', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('courses', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('categories', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('users', XMLDB_TYPE_TEXT, null, null, null, null, null);
+
+        // Adding keys to table report_coursesize_files.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        // Conditionally launch create table for report_coursesize_files.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Coursesize savepoint reached.
+        upgrade_plugin_savepoint(true, 2019052800, 'report', 'coursesize');
     }
 
     return true;
