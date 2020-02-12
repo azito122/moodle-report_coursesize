@@ -96,7 +96,6 @@ class results_manager {
         $cache->set('sizes', $sizes);
     }
 
-
     /**
      * Wraps get_directory_size().
      *

@@ -29,9 +29,9 @@ $ADMIN->add('reports', new admin_externalpage('report_coursesize', get_string('p
 
 if ($ADMIN->fulltree) {
     $settings->add(
-        new admin_setting_configtext('report_coursesize/batch_limit',
-            get_string('settings:batch_limit', 'report_coursesize'),
-            get_string('settings:batch_limit:description', 'report_coursesize'),
+        new admin_setting_configtext('report_coursesize/iteration_limit',
+            get_string('settings:iteration_limit', 'report_coursesize'),
+            get_string('settings:iteration_limit:description', 'report_coursesize'),
             100,
             PARAM_INT
         )

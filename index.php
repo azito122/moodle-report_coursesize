@@ -34,7 +34,7 @@ admin_externalpage_setup('report_coursesize');
 // $task = new \report_coursesize\task\build_data_task();
 // $task->set_custom_data(
 //     array(
-//         'batch_limit'       => 100,
+//         'iteration_limit'       => 100,
 //         'file_records_done' => false,
 //         'processed_records' => array(),
 //         'files'             => array(),
