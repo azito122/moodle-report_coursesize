@@ -31,9 +31,6 @@ class file_mappings {
     protected function get_file_records() {
         global $DB;
 
-        $skipids  = (string) implode(',', (array) $this->processed_record_ids);
-        $wheresql = !empty($skipids) ? "WHERE f.id NOT IN ($skipids)" : '';
-
         $filessql = "SELECT
                 f.id,
                 f.filesize,
@@ -47,7 +44,6 @@ class file_mappings {
             FROM {files} f
             INNER JOIN {context} cx
                 ON cx.id=f.contextid
-            $wheresql
             ORDER by cx.depth ASC, cx.path ASC";
 
         return $DB->get_recordset_sql($filessql);
