@@ -31,22 +31,14 @@ class file_mappings {
     protected function get_file_records() {
         global $DB;
 
-        $filessql = "SELECT
+        $select = "SELECT
                 f.id,
                 f.filesize,
                 f.contenthash,
                 f.component,
-                cx.id as contextid,
-                cx.contextlevel,
-                cx.instanceid,
-                cx.path,
-                cx.depth
-            FROM {files} f
-            INNER JOIN {context} cx
-                ON cx.id=f.contextid
-            ORDER by cx.depth ASC, cx.path ASC";
+                f.contextid";
 
-        return $DB->get_recordset_sql($filessql);
+        return $DB->get_recordset('files', [], '', 'id,filesize,contenthash,component,contextid');
     }
 
     public function get_file_mappings() {
@@ -122,27 +114,28 @@ class file_mappings {
             );
         }
 
-        switch($filerecord->contextlevel) {
+        $context = \context::instance_by_id($filerecord->contextid);
+        switch($context->contextlevel) {
             case CONTEXT_USER:
-                $this->process_file_record_user($filerecord, $filerecord->instanceid);
+                $this->process_file_record_user($filerecord, $context->instanceid);
                 break;
             case CONTEXT_COURSE:
-                $this->process_file_record_course($filerecord);
+                $this->process_file_record_course($filerecord, $context);
                 break;
             case CONTEXT_COURSECAT:
-                $this->process_file_record_category($filerecord, $filerecord->instanceid);
+                $this->process_file_record_category($filerecord, $context->instanceid);
                 break;
             case CONTEXT_SYSTEM:
-                $this->process_file_record_other($filerecord);
+                $this->process_file_record_other($filerecord, $context->instanceid);
                 break;
             default:
                 // Not a course, user, system, category, see it it's something that should be listed under a course
                 // Modules & Blocks mostly.
-                $course = self::find_course_from_context($filerecord->path);
+                $course = self::find_course_from_context($context->path);
                 if (!$course) {
-                    $this->process_file_record_other($filerecord);
+                    $this->process_file_record_other($filerecord, $context->instanceid);
                 } else {
-                    $this->process_file_record_course($filerecord, $course);
+                    $this->process_file_record_course($filerecord, $context, $course);
                 }
                 break;
         }
@@ -152,8 +145,8 @@ class file_mappings {
         \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->users, $userid);
     }
 
-    protected function process_file_record_course($file, $course = null) {
-        $course = $course ?? $this->courselookup[$file->contextid];
+    protected function process_file_record_course($file, $context, $course = null) {
+        $course = $course ?? $this->courselookup[$context->id]; // Load full course from courselookup so we have the categoryid.
         \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->courses, $course->courseid);
         $this->process_file_record_category($file, $course->categoryid);
     }
@@ -162,8 +155,8 @@ class file_mappings {
         \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->categories, $categoryid);
     }
 
-    protected function process_file_record_other($file) {
-        array_push($this->file_mappings[$file->contenthash]->other, $file->instanceid);
+    protected function process_file_record_other($file, $instanceid) {
+        array_push($this->file_mappings[$file->contenthash]->other, $instanceid);
     }
 
     /**
