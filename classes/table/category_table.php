@@ -83,7 +83,7 @@ class category_table extends flexible_table {
             $row->total = 0;
         }
 
-        $formattedbytes = report_coursesize_bytes_to_megabytes($row->total);
+        $formattedbytes = \report_coursesize\util::bytes_to_megabytes($row->total);
 
         if ($this->is_downloading()) {
             return $formattedbytes;
@@ -105,7 +105,7 @@ class category_table extends flexible_table {
             $row->unique = 0;
         }
 
-        $formattedbytes = report_coursesize_bytes_to_megabytes($row->unique);
+        $formattedbytes = \report_coursesize\util::bytes_to_megabytes($row->unique);
 
         if ($this->is_downloading()) {
             return $formattedbytes;
@@ -127,7 +127,7 @@ class category_table extends flexible_table {
             $row->backup = 0;
         }
 
-        $formattedbytes = report_coursesize_bytes_to_megabytes($row->backup);
+        $formattedbytes = \report_coursesize\util::bytes_to_megabytes($row->backup);
 
         if ($this->is_downloading()) {
             return $formattedbytes;

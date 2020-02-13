@@ -30,45 +30,47 @@ defined('MOODLE_INTERNAL') || die();
 
 class context_sizes {
     protected $file_mappings;
+    protected $sizes;
     protected $iteration_limit;
     protected $iteration_count;
 
-    // public $systembackupsize = 0;
+    public function get_sizes($area = 'in_progress') {
+        $cache = \cache::make('report_coursesize', $area);
 
-    public $system_sizes = array();
-    public $courses      = array();
-    public $categories   = array();
-    public $users        = array();
-
-    public function get_sizes($which = null) {
-        $cache = \cache::make('report_coursesize', 'in_progress');
-
-        if (!isset($which)) {
-            return (object) array(
-                'course_sizes'   => $cache->get('course_sizes'),
-                'category_sizes' => $cache->get('category_sizes'),
-                'user_sizes'     => $cache->get('user_sizes'),
-                'system_sizes'   => $cache->get('system_sizes'),
-            );
+        if (isset($this->sizes)) {
+            return $this->sizes;
         }
 
-        return $cache->get($which . '_sizes') ?? array();
+        return (object) array(
+            'courses'    => \report_coursesize\util::cache_get($cache, 'course_sizes', array()),
+            'categories' => \report_coursesize\util::cache_get($cache, 'category_sizes', array()),
+            'users'      => \report_coursesize\util::cache_get($cache, 'user_sizes', array()),
+            'system'     => \report_coursesize\util::cache_get($cache, 'system_sizes', (object) array(
+                'total'  => 0,
+                'backup' => 0,
+            )),
+        );
     }
 
-    public function update_sizes($which, $value) {
+    public function set_sizes($sizes, $area = 'in_progress') {
+        $cache = \cache::make('report_coursesize', $area);
+
+        $cache->set('course_sizes', $sizes->courses);
+        $cache->set('category_sizes', $sizes->categories);
+        $cache->set('user_sizes', $sizes->users);
+        $cache->set('system_sizes', $sizes->system);
+    }
+
+    public function clear_in_progress() {
         $cache = \cache::make('report_coursesize', 'in_progress');
-        return $cache->set($which . '_sizes', $value);
+        $cache->purge();
     }
 
     public function process_file_mappings($iterationlimit) {
         $this->iteration_limit = $iterationlimit;
-        $this->course_sizes    = $this->get_sizes('course');
-        $this->category_sizes  = $this->get_sizes('category');
-        $this->user_sizes      = $this->get_sizes('user');
-        $this->system_sizes    = $this->get_sizes('system');
-
-        $filemappings        = new \report_coursesize\file_mappings();
-        $this->file_mappings = $filemappings->get_file_mappings();
+        $this->sizes           = $this->get_sizes();
+        $filemappings          = new \report_coursesize\file_mappings();
+        $this->file_mappings   = $filemappings->get_file_mappings();
 
         foreach ($this->file_mappings as $id => $filemapping) {
             if ($this->iteration_count >= $this->iteration_limit) {
@@ -78,14 +80,95 @@ class context_sizes {
             unset($this->file_mappings[$id]);
         }
 
-        $filemappings->update_file_mappings($this->file_mappings);
+        $filemappings->set_file_mappings($this->file_mappings);
 
-        $this->update_sizes('course', $this->course_sizes);
-        $this->update_sizes('category', $this->category_sizes);
-        $this->update_sizes('user', $this->user_sizes);
-        $this->update_sizes('system', $this->system_sizes);
+        $this->set_sizes($this->sizes);
 
         return count($this->file_mappings);
+    }
+
+    private function process_file_mapping($filemapping) {
+        global $DB;
+
+        // $isbackup = ($filemapping->component == 'backup');
+        $isbackup = false;
+
+        $this->sizes->system->total += $filemapping->size;
+        // $this->systembackupsize += $isbackup ? $filemapping->size : 0;
+
+        foreach ($filemapping->users as $userid) {
+            self::maybe_add_blank_context($userid, $this->sizes->users);
+
+            $this->sizes->users[$userid]->total += $filemapping->size;
+            if (
+                count($filemapping->users)      == 1 &&
+                count($filemapping->courses)    == 0 &&
+                count($filemapping->categories) == 0 &&
+                count($filemapping->other)      == 0
+            ) {
+                $this->sizes->users[$userid]->unique += $filemapping->size;
+            }
+
+            if ($isbackup) {
+                $this->sizes->users[$userid]->backup += $filemapping->size;
+            }
+
+            $this->iteration_count += 1;
+        }
+
+        foreach ($filemapping->courses as $courseid) {
+            self::maybe_add_blank_context($courseid, $this->sizes->courses);
+
+            // Metadata.
+            if (!property_exists($this->sizes->courses[$courseid], 'shortname')) {
+                $course = $DB->get_record('course', array('id' => $courseid));
+
+                $this->sizes->courses[$courseid]->id        = $courseid;
+                $this->sizes->courses[$courseid]->shortname = $course->shortname;
+                $this->sizes->courses[$courseid]->category  = $course->category;
+            }
+
+            $this->sizes->courses[$courseid]->total += $filemapping->size;
+            if (
+                count($filemapping->courses) == 1 &&
+                count($filemapping->other)   == 0
+            ) {
+                $this->sizes->courses[$courseid]->unique += $filemapping->size;
+            }
+
+            if ($isbackup) {
+                $this->sizes->courses[$courseid]->backup += $filemapping->size;
+            }
+
+            $this->iteration_count += 1;
+        }
+
+        foreach ($filemapping->categories as $categoryid) {
+            self::maybe_add_blank_context($categoryid, $this->sizes->categories);
+
+            if (!property_exists($this->sizes->categories[$categoryid], 'name')) {
+                $category = $DB->get_record('course_categories', array('id' => $categoryid));
+
+                $this->sizes->categories[$categoryid]->id   = $categoryid;
+                $this->sizes->categories[$categoryid]->name = $category->name;
+            }
+
+            $this->sizes->categories[$categoryid]->total += $filemapping->size;
+            if (
+                count($filemapping->categories) == 1 &&
+                count($filemapping->other)      == 0
+            ) {
+                $this->sizes->categories[$categoryid]->unique += $filemapping->size;
+            }
+
+            if ($isbackup) {
+                $this->sizes->categories[$categoryid]->backup += $filemapping->size;
+            }
+
+            $this->iteration_count += 1;
+        }
+
+        $this->iteration_count += 1;
     }
 
     private function maybe_add_blank_context($key, &$array) {
@@ -95,88 +178,5 @@ class context_sizes {
             $array[$key]->unique = 0;
             $array[$key]->backup = 0;
         }
-    }
-
-    private function process_file_mapping($filemapping) {
-        global $DB;
-
-        // $isbackup = ($filemapping->component == 'backup');
-        $isbackup = false;
-
-        $this->system_sizes->total += $filemapping->size;
-        // $this->systembackupsize += $isbackup ? $filemapping->size : 0;
-
-        foreach ($filemapping->users as $userid) {
-            self::maybe_add_blank_context($userid, $this->users);
-
-            $this->users[$userid]->total += $filemapping->size;
-            if (
-                count($filemapping->users)      == 1 &&
-                count($filemapping->courses)    == 0 &&
-                count($filemapping->categories) == 0 &&
-                count($filemapping->other)      == 0
-            ) {
-                $this->users[$userid]->unique += $filemapping->size;
-            }
-
-            if ($isbackup) {
-                $this->users[$userid]->backup += $filemapping->size;
-            }
-
-            $this->iterationcount += 1;
-        }
-
-        foreach ($filemapping->courses as $courseid) {
-            self::maybe_add_blank_context($courseid, $this->courses);
-
-            // Metadata.
-            $course = $DB->get_record('course', array('id' => $courseid));
-
-            $this->courses[$courseid]->id        = $courseid;
-            $this->courses[$courseid]->shortname = $course->shortname;
-            $this->courses[$courseid]->category  = $course->category;
-
-            $this->courses[$courseid]->total += $filemapping->size;
-            if (
-                count($filemapping->courses) == 1 &&
-                // count($filemapping->courses) <= 1 &&
-                count($filemapping->users)   == 0 &&
-                count($filemapping->other)   == 0
-            ) {
-                $this->courses[$courseid]->unique += $filemapping->size;
-            }
-
-            if ($isbackup) {
-                $this->courses[$courseid]->backup += $filemapping->size;
-            }
-
-            $this->iterationcount += 1;
-        }
-
-        foreach ($filemapping->categories as $categoryid) {
-            self::maybe_add_blank_context($categoryid, $this->categories);
-
-            $category = $DB->get_record('course_categories', array('id' => $categoryid));
-
-            $this->categories[$categoryid]->id   = $categoryid;
-            $this->categories[$categoryid]->name = $category->name;
-
-            $this->categories[$categoryid]->total += $filemapping->size;
-            if (
-                count($filemapping->categories) == 1 &&
-                count($filemapping->users)      == 0 &&
-                count($filemapping->other)      == 0
-            ) {
-                $this->categories[$categoryid]->unique += $filemapping->size;
-            }
-
-            if ($isbackup) {
-                $this->categories[$categoryid]->backup += $filemapping->size;
-            }
-
-            $this->iterationcount += 1;
-        }
-
-        $this->iterationcount += 1;
     }
 }

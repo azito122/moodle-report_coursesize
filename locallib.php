@@ -32,7 +32,3 @@ define('REPORT_COURSESIZE_NUMBEROFUSERS', 10);
 
 // How often should we update the total sitedata usage.
 define('REPORT_COURSESIZE_UPDATETOTAL', 1 * DAYSECS);
-
-function report_coursesize_bytes_to_megabytes($bytes) {
-    return number_format(ceil($bytes / 1048576));
-}

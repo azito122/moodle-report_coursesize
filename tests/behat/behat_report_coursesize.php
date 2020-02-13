@@ -95,7 +95,7 @@ class behat_report_coursesize extends behat_base {
 
             if (!empty($existing)) {
                 $data->id = $existing->id;
-                $DB->update_record('user_info_data', $data);
+                $DB->set_record('user_info_data', $data);
             } else {
                 $DB->insert_record('user_info_data', $data);
             }

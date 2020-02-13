@@ -29,44 +29,29 @@ require_once('locallib.php');
 
 admin_externalpage_setup('report_coursesize');
 
-/// DEBUGGG_--------------------------------------------------------------------------------
+// / DEBUGGG_--------------------------------------------------------------------------------
 // echo '<pre>';
-// $task = new \report_coursesize\task\build_data_task();
-// $task->set_custom_data(
-//     array(
-//         'iteration_limit'       => 100,
-//         'file_records_done' => false,
-//         'processed_records' => array(),
-//         'files'             => array(),
-//         // 'contexts'          => array(),
-//         // 'systemsize'        => 0,
-//         // 'systembackupsize'  => $data->systembackupsize,
-//     )
-// );
-// \core\task\manager::queue_adhoc_task(\report_coursesize\task\build_data_task::make(), true);
-// $task->execute();
 
-// $results  = \cache::make('report_coursesize', 'results');
-$cache    = \cache::make('report_coursesize', 'in_progress');
+$results = \cache::make('report_coursesize', 'results');
+$inprog  = \cache::make('report_coursesize', 'in_progress');
 
 // $cache->delete('course_sizes');
 // $cache->delete('category_sizes');
 // $cache->delete('user_sizes');
-var_dump($cache->get('course_sizes'));
+// $progress = $inprog->get('progress');
+// echo "\nStep: " . $progress->step;
+// echo "\nStage: " . $progress->stage;
+// echo "\n";
+// print_r($inprog->get('file_mappings'));
+// print_r($inprog->get('course_sizes'));
+// print_r($inprog->get('category_sizes'));
+// print_r($inprog->get('user_sizes'));
 // var_dump($results->get('updated'));
-// var_dump($results->get('sizes'));
+// var_dump($results->get('course_sizes'));
 // var_dump($cache->get('files'));
 // var_dump($cache->get('contexts'));
 
-// $category = \core_course_category::get(3);
-// var_dump($category->get_all_children_ids());
-// $tasks    = \core\task\manager::get_adhoc_tasks('\report_coursesize\task\build_data_task');
-// $build    = $tasks[array_keys($tasks)[0]];
-// $data     = $build->get_custom_data();
-// $progress = $data->progress;
-// echo 'Stage ' . $progress->stage . ' of ' . $progress->stagetot;
-// echo "\nStep " . $progress->step . ' of ' . $progress->steptot;
-die();
+// die();
 // -----------------------------------------------------------------------------------------
 
 $params                   = new \stdClass();
@@ -80,10 +65,10 @@ $params->userdownload     = optional_param('userdownload', '', PARAM_ALPHA);
 $resultsmanager = new \report_coursesize\results_manager;
 $sizes          = $resultsmanager->get_sizes($params->categoryid);
 
-if (!isset($sizes->contexts) || empty($sizes->contexts)) {
+if (empty($sizes->courses) && empty($sizes->categories)) {
     print $OUTPUT->header();
     print get_string('no_results', 'report_coursesize');
-    if ($progress = \report_coursesize\task\build_data_task::get_build_progress()) {
+    if ($progress = \report_coursesize\task\build_data_task::get_progress()) {
         print '<h5>' . get_string('build_status', 'report_coursesize') . '</h5>';
         print get_string('build_status_active', 'report_coursesize', $progress);
     }
@@ -91,8 +76,8 @@ if (!isset($sizes->contexts) || empty($sizes->contexts)) {
     die();
 }
 
-$systemsizereadable   = get_string('sizeinmb', 'report_coursesize', report_coursesize_bytes_to_megabytes($sizes->systemsize));
-$systembackupreadable = get_string('sizeinmb', 'report_coursesize', report_coursesize_bytes_to_megabytes($sizes->systembackupsize));
+$systemsizereadable = get_string('sizeinmb', 'report_coursesize', \report_coursesize\util::bytes_to_megabytes($sizes->system->total));
+// $systembackupreadable = get_string('sizeinmb', 'report_coursesize', \report_coursesize\util::bytes_to_megabytes($sizes->systembackupsize));
 
 // Setup the course table.
 $coursetable = new \report_coursesize\table\course_table($params->categoryid);
@@ -113,7 +98,7 @@ if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$us
     print $OUTPUT->header();
 
     print '<h5>' . get_string('build_status', 'report_coursesize') . '</h5>';
-    if ($progress = \report_coursesize\task\build_data_task::get_build_progress()) {
+    if ($progress = \report_coursesize\task\build_data_task::get_progress(true)) {
         print get_string('build_status_active', 'report_coursesize', $progress);
     } else {
         print get_string('build_status_none', 'report_coursesize');
@@ -124,7 +109,7 @@ if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$us
         print '<strong>' . get_string("totalsitedata", 'report_coursesize', number_format($sizes->total_site_usage) . " MB") . '</strong> ';
         print get_string("sizerecorded", "report_coursesize", date("Y-m-d H:i", $resultsmanager->updated)) . "<br/><br/>\n";
         print get_string('catsystemuse', 'report_coursesize', $systemsizereadable) . "<br/>";
-        print get_string('catsystembackupuse', 'report_coursesize', $systembackupreadable) . "<br/>";
+        // print get_string('catsystembackupuse', 'report_coursesize', $systembackupreadable) . "<br/>";
         if (!empty($CFG->filessizelimit)) {
             print get_string("sizepermitted", 'report_coursesize', number_format($CFG->filessizelimit)) . "<br/>\n";
         }
@@ -146,14 +131,14 @@ if (!$coursetable->is_downloading() && !$categorytable->is_downloading() && !$us
 // Display the course size table.
 if (!$categorytable->is_downloading()) {
     $coursetable->start_output();
-    $coursetable->build_table($sizes->contexts->courses);
+    $coursetable->build_table($sizes->courses);
     $coursetable->finish_output();
 }
 
 // Display the category size table.
 if (!$coursetable->is_downloading()) {
     $categorytable->start_output();
-    $categorytable->build_table($sizes->contexts->categories);
+    $categorytable->build_table($sizes->categories);
     $categorytable->finish_output();
 }
 
