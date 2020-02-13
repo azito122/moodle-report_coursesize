@@ -31,14 +31,14 @@ class file_mappings {
     protected function get_file_records() {
         global $DB;
 
-        $select = "SELECT
-                f.id,
-                f.filesize,
-                f.contenthash,
-                f.component,
-                f.contextid";
-
-        return $DB->get_recordset('files', [], '', 'id,filesize,contenthash,component,contextid');
+        return $DB->get_recordset(
+            'files',
+            [],
+            '',
+            'id,filesize,contenthash,component,contextid',
+            count($this->processed_record_ids),
+            $this->iteration_limit
+        );
     }
 
     public function get_file_mappings() {
@@ -72,11 +72,11 @@ class file_mappings {
     }
 
     public function process($iterationlimit) {
+        $this->processed_record_ids = $this->get_processed_record_ids();
         $this->iteration_limit      = $iterationlimit;
         $this->file_records         = $this->get_file_records();
         $this->courselookup         = $this->get_course_lookup_table();
         $this->file_mappings        = $this->get_file_mappings();
-        $this->processed_record_ids = $this->get_processed_record_ids();
 
         foreach ($this->file_records as $id => $filerecord) {
             if ($this->iteration_count >= $this->iteration_limit) {
