@@ -26,9 +26,11 @@ defined('MOODLE_INTERNAL') || die();
 
 $definitions = array(
     'results' => array(
-        'mode' => cache_store::MODE_APPLICATION
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
     ),
     'in_progress' => array(
-        'mode' => cache_store::MODE_APPLICATION
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
     )
 );
