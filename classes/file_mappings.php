@@ -34,7 +34,7 @@ class file_mappings {
         return $DB->get_recordset(
             'files',
             [],
-            '',
+            'id',
             'id,filesize,contenthash,component,contextid',
             count($this->processed_record_ids),
             $this->iteration_limit
