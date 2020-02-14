@@ -29,8 +29,8 @@ use stdClass;
 defined('MOODLE_INTERNAL') || die();
 
 class context_sizes {
-    protected $file_mappings;
-    protected $sizes;
+    public $file_mappings;
+    public $sizes;
     public $iteration_limit;
     public $iteration_count;
 

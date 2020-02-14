@@ -71,10 +71,15 @@ class build_data_task extends \core\task\adhoc_task {
     public static function get_progress($real = false) {
         $cache = \cache::make('report_coursesize', 'in_progress');
         $default = $real ? false : (object) array(
-            'step' => 0,
-            'stage' => 1
+            'step'      => 0,
+            'stage'     => 1,
+            'steptotal' => 0,
         );
-        return \report_coursesize\util::cache_get($cache, 'progress', $default);
+        $progress          = \report_coursesize\util::cache_get($cache, 'progress', $default);
+        if ($progress && $progress->steptotal != 0) {
+            $progress->percent = round(($progress->step / $progress->steptotal) * 100);
+        }
+        return $progress;
     }
 
     public static function set_progress($progress) {
@@ -87,22 +92,28 @@ class build_data_task extends \core\task\adhoc_task {
     }
 
     protected function build_file_mappings($progress) {
+        global $DB;
+
         $filemappings = new \report_coursesize\file_mappings();
         $filemappings->process($this->get_iteration_limit());
-        $progress->step = count($filemappings->processed_record_ids);
+
+        $progress->step      = count($filemappings->processed_record_ids);
+        $progress->steptotal = $DB->count_records('files');
 
         if (count($filemappings->file_records) == 0) {
-            $progress->stage = 2;
-            $progress->step  = 0;
+            $progress->stage     = 2;
+            $progress->step      = 0;
+            $progress->steptotal = 0;
         }
 
         return $progress;
     }
 
     protected function build_context_sizes($progress) {
-        $contextsizes    = new \report_coursesize\context_sizes();
-        $countprocessed  = $contextsizes->process_file_mappings($this->get_iteration_limit());
-        $progress->step += $countprocessed;
+        $contextsizes         = new \report_coursesize\context_sizes();
+        $countprocessed       = $contextsizes->process_file_mappings($this->get_iteration_limit());
+        $progress->step      += $countprocessed;
+        $progress->steptotal  = $progress->steptotal == 0 ? count($contextsizes->file_mappings) : $progress->steptotal;
 
         if ($contextsizes->iteration_count < $contextsizes->iteration_limit) {
             $progress->stage = 3;
