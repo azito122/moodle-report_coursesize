@@ -95,10 +95,6 @@ class file_mappings {
                 break;
             }
 
-            if (in_array($id, $this->processed_record_ids)) {
-                continue;
-            }
-
             $this->process_file_record($filerecord);
             $this->iteration_count++;
         }
