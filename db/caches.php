@@ -32,5 +32,13 @@ $definitions = array(
     'in_progress' => array(
         'mode' => cache_store::MODE_APPLICATION,
         'simplekeys' => true,
+    ),
+    'file_mappings' => array(
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+    ),
+    'sizes' => array(
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
     )
 );

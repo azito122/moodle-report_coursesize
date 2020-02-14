@@ -21,8 +21,12 @@ require_once($CFG->dirroot . '/report/coursesize/locallib.php');
 class file_mappings {
 
     public $file_records;
-    protected $file_mappings;
-    protected $course_lookup;
+    // public $file_mappings;
+
+    public $current_file_record;
+    public $current_file_mapping;
+
+    public $course_lookup;
 
     public $iteration_limit;
     public $iteration_count;
@@ -53,33 +57,29 @@ class file_mappings {
         );
     }
 
-    public function get_file_mappings() {
-        $cache = \cache::make('report_coursesize', 'in_progress');
-        if ($r = $cache->get('file_mappings')) {
-            return $r;
-        } else {
-            return array();
-        }
-    }
+    // public function get_file_mappings() {
+    //     $cache = \cache::make('report_coursesize', 'in_progress');
+    //     if ($r = $cache->get('file_mappings')) {
+    //         return $r;
+    //     } else {
+    //         return array();
+    //     }
+    // }
 
-    public function set_file_mappings($filemappings = null) {
-        $filemappings = $filemappings ?? $this->file_mappings;
-        $cache = \cache::make('report_coursesize', 'in_progress');
-        return $cache->set('file_mappings', $filemappings);
-    }
+    // public function set_file_mappings($filemappings = null) {
+    //     $filemappings = $filemappings ?? $this->file_mappings;
+    //     $cache = \cache::make('report_coursesize', 'in_progress');
+    //     return $cache->set('file_mappings', $filemappings);
+    // }
 
     public function get_processed_record_ids() {
-        $cache = \cache::make('report_coursesize', 'in_progress');
-        if ($r = $cache->get('processed_record_ids')) {
-            return $r;
-        } else {
-            return array();
-        }
+        $cache = \cache::make('report_coursesize', 'file_mappings');
+        return \report_coursesize\util::cache_get($cache, 'processed_record_ids', array());
     }
 
     public function set_processed_record_ids($pris = null) {
         $pris = $pris ?? $this->processed_record_ids;
-        $cache = \cache::make('report_coursesize', 'in_progress');
+        $cache = \cache::make('report_coursesize', 'file_mappings');
         return $cache->set('processed_record_ids', $pris);
     }
 
@@ -87,81 +87,89 @@ class file_mappings {
         $this->processed_record_ids = $this->get_processed_record_ids();
         $this->iteration_limit      = $iterationlimit;
         $this->file_records         = $this->get_file_records();
+
+
         $this->courselookup         = $this->get_course_lookup_table();
-        $this->file_mappings        = $this->get_file_mappings();
+        // $this->file_mappings        = $this->get_file_mappings();
+
+        $this->file_mappings_cache = \cache::make('report_coursesize', 'file_mappings');
 
         foreach ($this->file_records as $id => $filerecord) {
             if ($this->iteration_count >= $this->iteration_limit) {
                 break;
             }
 
-            $this->process_file_record($filerecord);
+            $this->current_file_record = $filerecord;
+            $this->process_current_file_record();
             $this->iteration_count++;
         }
 
-        if (count($this->processed_record_ids) > 0) {
-            $this->set_processed_record_ids();
-            $this->set_file_mappings();
-        }
+        $this->set_processed_record_ids();
 
         return $this->processed_record_ids;
     }
 
-    protected function process_file_record($filerecord) {
-        array_push($this->processed_record_ids, $filerecord->id);
+    protected function process_current_file_record() {
 
-        if (!array_key_exists($filerecord->contenthash, $this->file_mappings)) {
-            $this->file_mappings[$filerecord->contenthash] = (object) array(
+        // if (!array_key_exists($filerecord->contenthash, $this->file_mappings)) {
+        //     $this->file_mappings[$filerecord->contenthash]
+        // }
+
+        $this->current_file_mapping = $this->file_mappings_cache->get($this->current_file_record->contenthash);
+        if (!$this->current_file_mapping) {
+            $this->current_file_mapping = (object) array(
                 'courses'    => array(),
                 'categories' => array(),
                 'users'      => array(),
                 'other'      => array(),
-                'size'       => $filerecord->filesize,
+                'size'       => $this->current_file_record->filesize,
             );
         }
-
-        switch($filerecord->contextlevel) {
+        switch($this->current_file_record->contextlevel) {
             case CONTEXT_USER:
-                $this->process_file_record_user($filerecord, $filerecord->instanceid);
+                $this->process_file_record_user();
                 break;
             case CONTEXT_COURSE:
-                $this->process_file_record_course($filerecord);
+                $this->process_file_record_course();
                 break;
             case CONTEXT_COURSECAT:
-                $this->process_file_record_category($filerecord, $filerecord->instanceid);
+                $this->process_file_record_category();
                 break;
             case CONTEXT_SYSTEM:
-                $this->process_file_record_other($filerecord, $filerecord->instanceid);
+                $this->process_file_record_other();
                 break;
             default:
                 // Not a course, user, system, category, see it it's something that should be listed under a course
                 // Modules & Blocks mostly.
-                $course = self::find_course_from_context($filerecord->path);
+                $course = self::find_course_from_context($this->current_file_record->path);
                 if (!$course) {
-                    $this->process_file_record_other($filerecord, $filerecord->instanceid);
+                    $this->process_file_record_other();
                 } else {
-                    $this->process_file_record_course($filerecord, $course);
+                    $this->process_file_record_course($course);
                 }
                 break;
         }
+        $this->processed_record_ids[] = $this->current_file_record->id;
+        $this->file_mappings_cache->set($this->current_file_record->contenthash, $this->current_file_mapping);
     }
 
-    protected function process_file_record_user($file, $userid) {
-        \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->users, $userid);
+    protected function process_file_record_user() {
+        \report_coursesize\util::array_push_unique($this->current_file_mapping->users, $this->current_file_record->instanceid);
     }
 
-    protected function process_file_record_course($file, $course = null) {
-        $course = $course ?? $this->courselookup[$file->contextid]; // Load full course from courselookup so we have the categoryid.
-        \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->courses, $course->courseid);
-        $this->process_file_record_category($file, $course->categoryid);
+    protected function process_file_record_course($course = null) {
+        $course = $course ?? $this->courselookup[$this->current_file_record->contextid]; // Load full course from courselookup so we have the categoryid.
+        \report_coursesize\util::array_push_unique($this->current_file_mapping->courses, $course->courseid);
+        $this->process_file_record_category($course->categoryid);
     }
 
-    protected function process_file_record_category($file, $categoryid) {
-        \report_coursesize\util::array_push_unique($this->file_mappings[$file->contenthash]->categories, $categoryid);
+    protected function process_file_record_category($categoryid = null) {
+        $categoryid = $categoryid ?? $this->current_file_record->instanceid;
+        \report_coursesize\util::array_push_unique($this->current_file_mapping->categories, $categoryid);
     }
 
-    protected function process_file_record_other($file, $instanceid) {
-        array_push($this->file_mappings[$file->contenthash]->other, $instanceid);
+    protected function process_file_record_other() {
+        array_push($this->current_file_mapping->other, $this->current_file_record->instanceid);
     }
 
     /**

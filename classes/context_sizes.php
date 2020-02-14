@@ -29,7 +29,8 @@ use stdClass;
 defined('MOODLE_INTERNAL') || die();
 
 class context_sizes {
-    public $file_mappings;
+    // public $file_mappings;
+    public $contenthashes;
     public $sizes;
     public $iteration_limit;
     public $iteration_count;
@@ -69,20 +70,31 @@ class context_sizes {
     public function process_file_mappings($iterationlimit) {
         $this->iteration_limit = $iterationlimit;
         $this->sizes           = $this->get_sizes();
-        $filemappings          = new \report_coursesize\file_mappings();
-        $this->file_mappings   = $filemappings->get_file_mappings();
 
+        $filemappingscache = \cache::make('report_coursesize', 'file_mappings');
+        $contenthashes = $filemappingscache->get('content_hashes');
+        $this->contenthashes = $contenthashes;
+
+        // $filemappings          = new \report_coursesize\file_mappings();
+        // $this->file_mappings   = $filemappings->get_file_mappings();
+
+        $futurecontenthashes = $contenthashes;
         $countprocessed = 0;
-        foreach ($this->file_mappings as $id => $filemapping) {
+        foreach ($contenthashes as $k => $contenthash) {
             if ($this->iteration_count >= $this->iteration_limit) {
                 break;
             }
+            $filemapping = $filemappingscache->get($contenthash);
             $this->process_file_mapping($filemapping);
-            unset($this->file_mappings[$id]);
+
+            $filemappingscache->delete($contenthash);
+            unset($futurecontenthashes[$k]);
+
             $countprocessed += 1;
         }
 
-        $filemappings->set_file_mappings($this->file_mappings);
+        $filemappingscache->set('content_hashes', $futurecontenthashes);
+        // $filemappings->set_file_mappings($this->file_mappings);
 
         $this->set_sizes($this->sizes);
 

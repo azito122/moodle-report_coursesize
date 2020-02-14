@@ -104,6 +104,10 @@ class build_data_task extends \core\task\adhoc_task {
             $progress->stage     = 2;
             $progress->step      = 0;
             $progress->steptotal = 0;
+
+            $cache = \cache::make('report_coursesize', 'file_mappings');
+            $contenthashes = $DB->get_fieldset_sql("SELECT DISTINCT contenthash FROM {files}");
+            $cache->set('content_hashes', $contenthashes);
         }
 
         return $progress;
@@ -113,7 +117,7 @@ class build_data_task extends \core\task\adhoc_task {
         $contextsizes         = new \report_coursesize\context_sizes();
         $countprocessed       = $contextsizes->process_file_mappings($this->get_iteration_limit());
         $progress->step      += $countprocessed;
-        $progress->steptotal  = $progress->steptotal == 0 ? count($contextsizes->file_mappings) : $progress->steptotal;
+        $progress->steptotal  = $progress->steptotal == 0 ? count($contextsizes->contenthashes) : $progress->steptotal;
 
         if ($contextsizes->iteration_count < $contextsizes->iteration_limit) {
             $progress->stage = 3;
