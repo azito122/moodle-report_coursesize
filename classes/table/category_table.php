@@ -34,6 +34,7 @@ class category_table extends flexible_table {
     public function __construct($categoryid) {
         parent::__construct("report-coursesize-categories");
         $this->init($categoryid);
+        $this->sortable(true, 'total');
     }
 
     protected function init($categoryid) {
@@ -56,6 +57,7 @@ class category_table extends flexible_table {
         }
 
         // Output courses.
+        $categories = $this->sort_columns($categories);
         foreach ($categories as $category) {
             $sumtotal  += $category->total;
             $sumunique += $category->unique;

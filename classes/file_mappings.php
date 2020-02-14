@@ -88,7 +88,6 @@ class file_mappings {
         $this->iteration_limit      = $iterationlimit;
         $this->file_records         = $this->get_file_records();
 
-
         $this->courselookup         = $this->get_course_lookup_table();
         // $this->file_mappings        = $this->get_file_mappings();
 

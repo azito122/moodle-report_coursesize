@@ -34,6 +34,8 @@ class course_table extends flexible_table {
     public function __construct($categoryid) {
         parent::__construct("report-coursesize-category-{$categoryid}");
         $this->init($categoryid);
+
+        $this->sortable(true, 'total');
     }
 
     protected function init($categoryid) {
@@ -42,12 +44,17 @@ class course_table extends flexible_table {
             get_string('course'),
             get_string('table:column_header:total', 'report_coursesize'),
             get_string('table:column_header:unique', 'report_coursesize'),
-            get_string('table:column_header:backup', 'report_coursesize')
+            get_string('table:column_header:backup', 'report_coursesize'),
+            get_string('table:column_header:id', 'report_coursesize'),
+            get_string('table:column_header:idnumber', 'report_coursesize'),
         ));
         $this->define_baseurl(new \moodle_url('/report/coursesize/index.php', array('category' => $categoryid)));
     }
 
     public function build_table($courses) {
+        $columns = $this->is_downloading() ? ['id', 'idnumber'] : [];
+        $this->define_columns(array_merge(array_flip($this->columns), $columns));
+
         // Size counters.
         $sumtotal = $sumunique = $sumbackup = 0;
 
@@ -56,6 +63,7 @@ class course_table extends flexible_table {
         }
 
         // Output courses.
+        $courses = $this->sort_columns($courses);
         foreach ($courses as $course) {
             $sumtotal  += $course->total;
             $sumunique += $course->unique;

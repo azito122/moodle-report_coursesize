@@ -138,6 +138,7 @@ class context_sizes {
                 $course = $DB->get_record('course', array('id' => $courseid));
 
                 $this->sizes->courses[$courseid]->id        = $courseid;
+                $this->sizes->courses[$courseid]->idnumber  = $course->idnumber;
                 $this->sizes->courses[$courseid]->shortname = $course->shortname;
                 $this->sizes->courses[$courseid]->category  = $course->category;
             }

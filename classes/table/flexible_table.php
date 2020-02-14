@@ -53,4 +53,20 @@ class flexible_table extends \flexible_table {
             return '';
         }
     }
+
+    public function sort_columns($data) {
+        $sort = $this->get_sort_columns();
+        if ($sort) {
+            $sortcol = array_keys($sort)[0];
+            $sortord = $sort[$sortcol];
+            usort($data, function($a, $b) use ($sortcol, $sortord) {
+                if ($sortord == SORT_DESC) {
+                    return $a->{$sortcol} < $b->{$sortcol};
+                } else {
+                    return $a->{$sortcol} > $b->{$sortcol};
+                }
+            });
+        }
+        return $data;
+    }
 }

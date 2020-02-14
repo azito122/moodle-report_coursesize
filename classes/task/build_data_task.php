@@ -47,7 +47,7 @@ class build_data_task extends \core\task\adhoc_task {
     /**
      * Execute the task
      */
-    public function execute() {
+    public function execute($rescheduleself = true) {
         $progress = $this->get_progress();
 
         switch ($progress->stage) {
@@ -59,13 +59,17 @@ class build_data_task extends \core\task\adhoc_task {
                 break;
             case 3:
                 $this->execute_final();
-                return;
+                return true;
         }
 
         $this->set_progress($progress);
 
-        $next = self::make();
-        \core\task\manager::queue_adhoc_task($next);
+        if ($rescheduleself) {
+            $next = self::make();
+            \core\task\manager::queue_adhoc_task($next);
+        }
+
+        return false;
     }
 
     public static function get_progress($real = false) {
