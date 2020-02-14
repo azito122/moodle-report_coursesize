@@ -31,8 +31,8 @@ defined('MOODLE_INTERNAL') || die();
 class context_sizes {
     protected $file_mappings;
     protected $sizes;
-    protected $iteration_limit;
-    protected $iteration_count;
+    public $iteration_limit;
+    public $iteration_count;
 
     public function get_sizes($area = 'in_progress') {
         $cache = \cache::make('report_coursesize', $area);
@@ -72,19 +72,21 @@ class context_sizes {
         $filemappings          = new \report_coursesize\file_mappings();
         $this->file_mappings   = $filemappings->get_file_mappings();
 
+        $countprocessed = 0;
         foreach ($this->file_mappings as $id => $filemapping) {
             if ($this->iteration_count >= $this->iteration_limit) {
                 break;
             }
             $this->process_file_mapping($filemapping);
             unset($this->file_mappings[$id]);
+            $countprocessed += 1;
         }
 
         $filemappings->set_file_mappings($this->file_mappings);
 
         $this->set_sizes($this->sizes);
 
-        return count($this->file_mappings);
+        return $countprocessed;
     }
 
     private function process_file_mapping($filemapping) {

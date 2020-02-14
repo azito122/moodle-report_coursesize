@@ -20,7 +20,7 @@ require_once($CFG->dirroot . '/report/coursesize/locallib.php');
 
 class file_mappings {
 
-    protected $file_records;
+    public $file_records;
     protected $file_mappings;
     protected $course_lookup;
 
@@ -42,12 +42,13 @@ class file_mappings {
                 FROM {files} f
                 JOIN {context} cx
                     ON f.contextid=cx.id
-                ORDER BY id";
+                WHERE f.id > :lastid
+                ORDER BY f.id";
 
         return $DB->get_records_sql(
             $sql,
-            null,
-            count($this->processed_record_ids),
+            array('lastid' => empty($this->processed_record_ids) ? 0 : max($this->processed_record_ids)),
+            0,
             $this->iteration_limit
         );
     }

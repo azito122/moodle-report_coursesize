@@ -89,10 +89,9 @@ class build_data_task extends \core\task\adhoc_task {
     protected function build_file_mappings($progress) {
         $filemappings = new \report_coursesize\file_mappings();
         $filemappings->process($this->get_iteration_limit());
-
         $progress->step = count($filemappings->processed_record_ids);
 
-        if ($filemappings->iteration_count < $filemappings->iteration_limit) {
+        if (count($filemappings->file_records) == 0) {
             $progress->stage = 2;
             $progress->step  = 0;
         }
@@ -101,11 +100,11 @@ class build_data_task extends \core\task\adhoc_task {
     }
 
     protected function build_context_sizes($progress) {
-        $contextsizes   = new \report_coursesize\context_sizes();
-        $mappingsleft   = $contextsizes->process_file_mappings($this->get_iteration_limit());
-        // $data->progress->step = count($processedrecordids);
+        $contextsizes    = new \report_coursesize\context_sizes();
+        $countprocessed  = $contextsizes->process_file_mappings($this->get_iteration_limit());
+        $progress->step += $countprocessed;
 
-        if ($mappingsleft == 0) {
+        if ($contextsizes->iteration_count < $contextsizes->iteration_limit) {
             $progress->stage = 3;
             $progress->step  = 0;
         }
