@@ -101,7 +101,7 @@ class build_data_task extends \core\task\adhoc_task {
         $filemappings = new \report_coursesize\file_mappings();
         $filemappings->process($this->get_iteration_limit());
 
-        $progress->step      = count($filemappings->processed_record_ids);
+        $progress->step      = $filemappings->count_processed_records;
         $progress->steptotal = $DB->count_records('files');
 
         if (count($filemappings->file_records) == 0) {

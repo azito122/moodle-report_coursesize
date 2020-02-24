@@ -87,7 +87,7 @@ class context_sizes {
             $filemapping = $filemappingscache->get($contenthash);
             $this->process_file_mapping($filemapping);
 
-            $filemappingscache->delete($contenthash);
+            // $filemappingscache->delete($contenthash);
             unset($futurecontenthashes[$k]);
 
             $countprocessed += 1;

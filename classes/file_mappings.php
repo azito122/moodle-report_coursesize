@@ -21,16 +21,16 @@ require_once($CFG->dirroot . '/report/coursesize/locallib.php');
 class file_mappings {
 
     public $file_records;
-    // public $file_mappings;
+    public $course_lookup;
 
     public $current_file_record;
     public $current_file_mapping;
 
-    public $course_lookup;
-
     public $iteration_limit;
     public $iteration_count;
-    public $processed_record_ids;
+
+    public $last_processed_id;
+    public $count_processed_records;
 
     protected function get_file_records() {
         global $DB;
@@ -51,7 +51,7 @@ class file_mappings {
 
         return $DB->get_records_sql(
             $sql,
-            array('lastid' => empty($this->processed_record_ids) ? 0 : max($this->processed_record_ids)),
+            array('lastid' => $this->last_processed_id),
             0,
             $this->iteration_limit
         );
@@ -72,24 +72,35 @@ class file_mappings {
     //     return $cache->set('file_mappings', $filemappings);
     // }
 
-    public function get_processed_record_ids() {
+    public function get_last_processed_id() {
         $cache = \cache::make('report_coursesize', 'file_mappings');
-        return \report_coursesize\util::cache_get($cache, 'processed_record_ids', array());
+        return \report_coursesize\util::cache_get($cache, 'last_processed_id', 0);
     }
 
-    public function set_processed_record_ids($pris = null) {
-        $pris = $pris ?? $this->processed_record_ids;
+    public function set_last_processed_id($id = null) {
+        $id = $id ?? $this->last_processed_id;
         $cache = \cache::make('report_coursesize', 'file_mappings');
-        return $cache->set('processed_record_ids', $pris);
+        return $cache->set('last_processed_id', $id);
+    }
+
+    public function get_count_processed_records() {
+        $cache = \cache::make('report_coursesize', 'file_mappings');
+        return \report_coursesize\util::cache_get($cache, 'count_processed_records', 0);
+    }
+
+    public function set_count_processed_records($count = null) {
+        $count = $cpunt ?? $this->count_processed_records;
+        $cache = \cache::make('report_coursesize', 'file_mappings');
+        return $cache->set('count_processed_records', $count);
     }
 
     public function process($iterationlimit) {
-        $this->processed_record_ids = $this->get_processed_record_ids();
         $this->iteration_limit      = $iterationlimit;
-        $this->file_records         = $this->get_file_records();
 
-        $this->courselookup         = $this->get_course_lookup_table();
-        // $this->file_mappings        = $this->get_file_mappings();
+        $this->last_processed_id       = $this->get_last_processed_id();
+        $this->count_processed_records = $this->get_count_processed_records();
+        $this->file_records            = $this->get_file_records();
+        $this->courselookup            = $this->get_course_lookup_table();
 
         $this->file_mappings_cache = \cache::make('report_coursesize', 'file_mappings');
 
@@ -103,9 +114,10 @@ class file_mappings {
             $this->iteration_count++;
         }
 
-        $this->set_processed_record_ids();
+        $this->set_last_processed_id();
+        $this->set_count_processed_records();
 
-        return $this->processed_record_ids;
+        return $this->count_processed_records;
     }
 
     protected function process_current_file_record() {
@@ -148,7 +160,7 @@ class file_mappings {
                 }
                 break;
         }
-        $this->processed_record_ids[] = $this->current_file_record->id;
+        $this->count_processed_records++;
         $this->file_mappings_cache->set($this->current_file_record->contenthash, $this->current_file_mapping);
     }
 
